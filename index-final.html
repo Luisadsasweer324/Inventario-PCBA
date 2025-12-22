@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Inventario - Versión Final</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        body.light-mode {
+            background: linear-gradient(135deg, #1e293b 0%, #1e40af 50%, #1e293b 100%);
+            color: #1e293b;
+        }
+
+        body.dark-mode {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            color: #e2e8f0;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 5px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        @keyframes alert-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
+        }
+
+        .stock-alert {
+            animation: alert-pulse 2s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="light-mode">
+    <div id="root"></div>
+
+    <script>
+        window.storage = {
+            async get(key) {
+                try {
+                    const value = localStorage.getItem(key);
+                    return value ? { key, value } : null;
+                } catch (error) {
+                    return null;
+                }
+            },
+            async set(key, value) {
+                try {
+                    localStorage.setItem(key, value);
+                    return { key, value };
+                } catch (error) {
+                    return null;
+                }
+            },
+            async delete(key) {
+                try {
+                    localStorage.removeItem(key);
+                    return { key, deleted: true };
+                } catch (error) {
+                    return null;
+                }
+            }
+        };
+
+        async function sendEmail(to, subject, message) {
+            console.log('📧 Email simulado:', to, subject);
+            return true;
+        }
+    </script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // ==================== ICONOS ====================
+        const Download = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+        );
+
+        const Upload = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+        );
+
+        const Plus = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+        );
+
+        const Edit2 = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+            </svg>
+        );
+
+        const Trash2 = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+        );
+
+        const Search = () => (
+            <svg className="absolute left-3 top-1/2 transform -translate-y-1/2" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.35-4.35"/>
+            </svg>
+        );
+
+        const CheckCircle = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+        );
+
+        const XCircle = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="15" y1="9" x2="9" y2="15"/>
+                <line x1="9" y1="9" x2="15" y2="15"/>
+            </svg>
+        );
+
+        const Clock = () => (
+            <svg className="w-16 h-16 text-yellow-400 mx-auto" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+            </svg>
+        );
+
+        const LogOut = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+        );
+
+        const Package = (props) => (
+            <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/>
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                <line x1="12" y1="22.08" x2="12" y2="12"/>
+            </svg>
+        );
+
+        const History = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 3v5h5"/>
+                <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/>
+            </svg>
+        );
+
+        const Bell = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+        );
+
+        const Moon = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+        );
+
+        const Sun = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="5"/>
+                <line x1="12" y1="1" x2="12" y2="3"/>
+                <line x1="12" y1="21" x2="12" y2="23"/>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                <line x1="1" y1="12" x2="3" y2="12"/>
+                <line x1="21" y1="12" x2="23" y2="12"/>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+        );
+
+        const BarChart = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="20" x2="12" y2="10"/>
+                <line x1="18" y1="20" x2="18" y2="4"/>
+                <line x1="6" y1="20" x2="6" y2="16"/>
+            </svg>
+        );
+
+        const AlertTriangle = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+        );
+
+        const TrendingUp = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                <polyline points="17 6 23 6 23 12"/>
+            </svg>
+        );
+
+        const TrendingDown = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/>
+                <polyline points="17 18 23 18 23 12"/>
+            </svg>
+        );
+
+        const MapPin = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                <circle cx="12" cy="10" r="3"/>
+            </svg>
+        );
+
+        // ==================== COMPONENTE PRINCIPAL ====================
+        function InventoryApp() {
+          const [currentUser, setCurrentUser] = useState(null);
+          const [view, setView] = useState('login');
+          const [inventory, setInventory] = useState([]);
+          const [searchTerm, setSearchTerm] = useState('');
+          const [editingItem, setEditingItem] = useState(null);
+          const [showHistory, setShowHistory] = useState(false);
+          const [showDashboard, setShowDashboard] = useState(false);
+          const [darkMode, setDarkMode] = useState(false);
+          const [formData, setFormData] = useState({
+            modelo: '', equipo: '', cantidad: '', ubicacion: '', 
+            operacionActual: '', proximaOperacion: '', comentario: '', stockMinimo: '10'
+          });
+
+          const [users, setUsers] = useState([
+            { id: 1, email: 'admin@empresa.com', password: 'admin123', role: 'admin', status: 'approved', name: 'Administrador' }
+          ]);
+          const [pendingUsers, setPendingUsers] = useState([]);
+          const [pendingMaterials, setPendingMaterials] = useState([]);
+          const [changeHistory, setChangeHistory] = useState([]);
+          const fileInputRef = useRef(null);
+
+          useEffect(() => {
+            const loadData = async () => {
+              try {
+                const userResult = await window.storage.get('current-user');
+                if (userResult) {
+                  setCurrentUser(JSON.parse(userResult.value));
+                  setView('dashboard');
+                }
+                const invResult = await window.storage.get('inventory-data');
+                if (invResult) setInventory(JSON.parse(invResult.value));
+                
+                const pendingResult = await window.storage.get('pending-users');
+                if (pendingResult) setPendingUsers(JSON.parse(pendingResult.value));
+                
+                const usersResult = await window.storage.get('approved-users');
+                if (usersResult) setUsers(JSON.parse(usersResult.value));
+                
+                const pendingMatResult = await window.storage.get('pending-materials');
+                if (pendingMatResult) setPendingMaterials(JSON.parse(pendingMatResult.value));
+                
+                const historyResult = await window.storage.get('change-history');
+                if (historyResult) setChangeHistory(JSON.parse(historyResult.value));
+
+                const darkModeResult = await window.storage.get('dark-mode');
+                if (darkModeResult) {
+                  const isDark = JSON.parse(darkModeResult.value);
+                  setDarkMode(isDark);
+                  document.body.className = isDark ? 'dark-mode' : 'light-mode';
+                }
+              } catch (error) {
+                console.log('Iniciando desde cero');
+              }
+            };
+            loadData();
+          }, []);
+
+          const saveToStorage = async (key, data) => {
+            try {
+              await window.storage.set(key, JSON.stringify(data));
+            } catch (error) {
+              console.error('Error guardando datos:', error);
+            }
+          };
+
+          const toggleDarkMode = () => {
+            const newMode = !darkMode;
+            setDarkMode(newMode);
+            document.body.className = newMode ? 'dark-mode' : 'light-mode';
+            saveToStorage('dark-mode', newMode);
+          };
+
+          const addToHistory = (action, details, user) => {
+            const historyEntry = {
+              id: Date.now(),
+              action,
+              details,
+              user: user?.name || user?.email || 'Sistema',
+              userEmail: user?.email || 'sistema',
+              timestamp: new Date().toLocaleString('es-MX'),
+              date: new Date().toISOString()
+            };
+            const updatedHistory = [historyEntry, ...changeHistory];
+            setChangeHistory(updatedHistory);
+            saveToStorage('change-history', updatedHistory);
+          };
+
+          const handleLogin = (e) => {
+            e.preventDefault();
+            const email = e.target.email.value;
+            const password = e.target.password.value;
+            const user = users.find(u => u.email === email && u.password === password && u.status === 'approved');
+            if (user) {
+              setCurrentUser(user);
+              saveToStorage('current-user', user);
+              addToHistory('Inicio de sesión', `Usuario ${user.name} inició sesión`, user);
+              setView('dashboard');
+            } else {
+              alert('Credenciales incorrectas o cuenta no aprobada');
+            }
+          };
+
+          const handleRegister = async (e) => {
+            e.preventDefault();
+            const email = e.target.email.value;
+            const password = e.target.password.value;
+            const name = e.target.name.value;
+            const comment = e.target.comment.value;
+
+            if (users.find(u => u.email === email) || pendingUsers.find(u => u.email === email)) {
+              alert('Este correo ya está registrado');
+              return;
+            }
+
+            const newUser = { 
+              id: Date.now(), 
+              name, 
+              email, 
+              password, 
+              comment,
+              role: 'user', 
+              status: 'pending',
+              requestDate: new Date().toLocaleString('es-MX')
+            };
+
+            const updatedPending = [...pendingUsers, newUser];
+            setPendingUsers(updatedPending);
+            saveToStorage('pending-users', updatedPending);
+
+            await sendEmail('admin@empresa.com', '🔔 Nueva solicitud de cuenta', `${name} (${email}) solicitó acceso`);
+            addToHistory('Solicitud de cuenta', `${name} (${email}) solicitó una cuenta`, { name: 'Sistema' });
+            setView('pending');
+          };
+
+          const handleLogout = () => {
+            addToHistory('Cierre de sesión', `Usuario ${currentUser.name} cerró sesión`, currentUser);
+            setCurrentUser(null);
+            window.storage.delete('current-user');
+            setView('login');
+          };
+
+          const approveUser = async (userId) => {
+            const userToApprove = pendingUsers.find(u => u.id === userId);
+            if (userToApprove) {
+              const approvedUser = { ...userToApprove, status: 'approved' };
+              const updatedUsers = [...users, approvedUser];
+              const updatedPending = pendingUsers.filter(u => u.id !== userId);
+              
+              setUsers(updatedUsers);
+              setPendingUsers(updatedPending);
+              saveToStorage('approved-users', updatedUsers);
+              saveToStorage('pending-users', updatedPending);
+
+              await sendEmail(userToApprove.email, '✅ Cuenta Aprobada', 'Tu cuenta ha sido aprobada');
+              addToHistory('Aprobación de usuario', `Admin aprobó la cuenta de ${userToApprove.name}`, currentUser);
+            }
+          };
+
+          const rejectUser = async (userId) => {
+            const userToReject = pendingUsers.find(u => u.id === userId);
+            if (userToReject) {
+              const updatedPending = pendingUsers.filter(u => u.id !== userId);
+              setPendingUsers(updatedPending);
+              saveToStorage('pending-users', updatedPending);
+
+              await sendEmail(userToReject.email, '❌ Solicitud Rechazada', 'Tu solicitud fue rechazada');
+              addToHistory('Rechazo de usuario', `Admin rechazó la cuenta de ${userToReject.name}`, currentUser);
+            }
+          };
+
+          const handleRequestMaterial = (e) => {
+            e.preventDefault();
+
+            if (!formData.modelo || !formData.cantidad || !formData.ubicacion) {
+              alert('Por favor completa: Modelo, Cantidad y Ubicación');
+              return;
+            }
+
+            const materialRequest = {
+              id: Date.now(),
+              ...formData,
+              cantidad: parseInt(formData.cantidad),
+              stockMinimo: 10, // Stock mínimo por defecto, solo el admin puede cambiarlo
+              requestedBy: currentUser.name,
+              requestedByEmail: currentUser.email,
+              requestDate: new Date().toLocaleString('es-MX'),
+              status: 'pending'
+            };
+
+            const updatedPending = [...pendingMaterials, materialRequest];
+            setPendingMaterials(updatedPending);
+            saveToStorage('pending-materials', updatedPending);
+
+            addToHistory('Solicitud de material', `${currentUser.name} solicitó: ${formData.modelo} en ${formData.ubicacion}`, currentUser);
+
+            setFormData({
+              modelo: '', equipo: '', cantidad: '', ubicacion: '', 
+              operacionActual: '', proximaOperacion: '', comentario: '', stockMinimo: '10'
+            });
+
+            alert('✅ Solicitud enviada al administrador');
+          };
+
+          const approveMaterial = (materialId) => {
+            const material = pendingMaterials.find(m => m.id === materialId);
+            if (material) {
+              // IMPORTANTE: Buscar por modelo Y ubicación
+              const existingItem = inventory.find(item => 
+                item.modelo.toLowerCase() === material.modelo.toLowerCase() &&
+                item.ubicacion.toLowerCase() === material.ubicacion.toLowerCase()
+              );
+
+              let updatedInventory;
+              if (existingItem) {
+                // Existe el mismo modelo en la misma ubicación: SUMAR
+                updatedInventory = inventory.map(item =>
+                  (item.modelo.toLowerCase() === material.modelo.toLowerCase() &&
+                   item.ubicacion.toLowerCase() === material.ubicacion.toLowerCase())
+                    ? { ...item, cantidad: parseInt(item.cantidad) + parseInt(material.cantidad) }
+                    : item
+                );
+                addToHistory('Material agregado (suma)', 
+                  `Admin sumó ${material.cantidad} de ${material.modelo} en ${material.ubicacion}. Total: ${existingItem.cantidad + material.cantidad}`, 
+                  currentUser);
+              } else {
+                // No existe o está en diferente ubicación: NUEVO REGISTRO
+                const newItem = {
+                  id: Date.now(),
+                  modelo: material.modelo,
+                  equipo: material.equipo,
+                  cantidad: material.cantidad,
+                  ubicacion: material.ubicacion,
+                  operacionActual: material.operacionActual,
+                  proximaOperacion: material.proximaOperacion,
+                  comentario: material.comentario,
+                  stockMinimo: 10, // Por defecto
+                  fechaRegistro: new Date().toLocaleDateString(),
+                  creadoPor: material.requestedBy
+                };
+                updatedInventory = [...inventory, newItem];
+                addToHistory('Material agregado (nuevo)', 
+                  `Admin aprobó: ${material.modelo} (${material.cantidad} unidades) en ${material.ubicacion}`, 
+                  currentUser);
+              }
+
+              setInventory(updatedInventory);
+              saveToStorage('inventory-data', updatedInventory);
+
+              const updatedPending = pendingMaterials.filter(m => m.id !== materialId);
+              setPendingMaterials(updatedPending);
+              saveToStorage('pending-materials', updatedPending);
+
+              checkStockAlerts(updatedInventory);
+              alert('✅ Material aprobado y agregado');
+            }
+          };
+
+          const rejectMaterial = (materialId) => {
+            const material = pendingMaterials.find(m => m.id === materialId);
+            if (material) {
+              const updatedPending = pendingMaterials.filter(m => m.id !== materialId);
+              setPendingMaterials(updatedPending);
+              saveToStorage('pending-materials', updatedPending);
+
+              addToHistory('Material rechazado', `Admin rechazó: ${material.modelo} en ${material.ubicacion}`, currentUser);
+              alert('❌ Solicitud rechazada');
+            }
+          };
+
+          const handleEdit = (item) => {
+            setEditingItem(item);
+            setFormData(item);
+          };
+
+          const handleUpdateMaterial = (e) => {
+            e.preventDefault();
+
+            if (!formData.modelo || !formData.cantidad || !formData.ubicacion) {
+              alert('Por favor completa: Modelo, Cantidad y Ubicación');
+              return;
+            }
+
+            const updatedInventory = inventory.map(item =>
+              item.id === editingItem.id ? { 
+                ...formData, 
+                id: item.id,
+                // Solo admin puede cambiar stockMinimo
+                stockMinimo: currentUser.role === 'admin' ? parseInt(formData.stockMinimo) || 10 : item.stockMinimo
+              } : item
+            );
+            setInventory(updatedInventory);
+            saveToStorage('inventory-data', updatedInventory);
+
+            addToHistory('Material editado', 
+              `${currentUser.name} editó: ${formData.modelo} en ${formData.ubicacion}`, 
+              currentUser);
+            checkStockAlerts(updatedInventory);
+
+            setEditingItem(null);
+            setFormData({
+              modelo: '', equipo: '', cantidad: '', ubicacion: '', 
+              operacionActual: '', proximaOperacion: '', comentario: '', stockMinimo: '10'
+            });
+          };
+
+          const handleDelete = (id) => {
+            const item = inventory.find(i => i.id === id);
+            if (window.confirm(`¿Eliminar ${item?.modelo} de ${item?.ubicacion}?`)) {
+              const updatedInventory = inventory.filter(item => item.id !== id);
+              setInventory(updatedInventory);
+              saveToStorage('inventory-data', updatedInventory);
+
+              addToHistory('Material eliminado', 
+                `${currentUser.name} eliminó: ${item.modelo} de ${item.ubicacion}`, 
+                currentUser);
+            }
+          };
+
+          const handleAdjustQuantity = (id, adjustment) => {
+            const updatedInventory = inventory.map(item => {
+              if (item.id === id) {
+                const newQuantity = parseInt(item.cantidad) + adjustment;
+                if (newQuantity < 0) {
+                  alert('La cantidad no puede ser negativa');
+                  return item;
+                }
+                addToHistory('Ajuste de cantidad', 
+                  `${currentUser.name} ajustó ${item.modelo} en ${item.ubicacion}: ${item.cantidad} → ${newQuantity}`, 
+                  currentUser);
+                return { ...item, cantidad: newQuantity };
+              }
+              return item;
+            });
+            setInventory(updatedInventory);
+            saveToStorage('inventory-data', updatedInventory);
+            checkStockAlerts(updatedInventory);
+          };
+
+          const checkStockAlerts = (inv) => {
+            const lowStock = inv.filter(item => parseInt(item.cantidad) <= (parseInt(item.stockMinimo) || 10));
+            if (lowStock.length > 0 && currentUser?.role === 'admin') {
+              const items = lowStock.map(i => `${i.modelo} en ${i.ubicacion} (${i.cantidad})`).join(', ');
+              setTimeout(() => {
+                alert(`⚠️ ALERTA DE STOCK BAJO:\n\n${items}\n\nRevisa el dashboard para más detalles.`);
+              }, 500);
+            }
+          };
+
+          const exportToExcel = () => {
+            if (inventory.length === 0) {
+              alert('No hay datos para exportar');
+              return;
+            }
+
+            const wsData = [
+              ['Modelo', 'Equipo', 'Cantidad', 'Stock Mínimo', 'Ubicación', 'Op. Actual', 'Próxima Op.', 'Comentario', 'Fecha', 'Creado Por'],
+              ...inventory.map(item => [
+                item.modelo,
+                item.equipo || '-',
+                item.cantidad,
+                item.stockMinimo || 10,
+                item.ubicacion,
+                item.operacionActual || '-',
+                item.proximaOperacion || '-',
+                item.comentario || '-',
+                item.fechaRegistro || '-',
+                item.creadoPor || '-'
+              ])
+            ];
+
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
+
+            XLSX.writeFile(wb, `inventario_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+            addToHistory('Exportación a Excel', `${currentUser.name} exportó el inventario`, currentUser);
+          };
+
+          const handleImportExcel = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+              try {
+                const data = new Uint8Array(evt.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+                let imported = 0;
+                let errors = 0;
+
+                const newItems = jsonData.map((row, index) => {
+                  try {
+                    if (!row.Modelo || !row.Cantidad || !row.Ubicación) {
+                      errors++;
+                      return null;
+                    }
+
+                    imported++;
+                    return {
+                      id: Date.now() + index,
+                      modelo: row.Modelo || '',
+                      equipo: row.Equipo || '',
+                      cantidad: parseInt(row.Cantidad) || 0,
+                      stockMinimo: parseInt(row['Stock Mínimo']) || 10,
+                      ubicacion: row.Ubicación || '',
+                      operacionActual: row['Op. Actual'] || '',
+                      proximaOperacion: row['Próxima Op.'] || '',
+                      comentario: row.Comentario || '',
+                      fechaRegistro: new Date().toLocaleDateString(),
+                      creadoPor: currentUser.name
+                    };
+                  } catch (err) {
+                    errors++;
+                    return null;
+                  }
+                }).filter(item => item !== null);
+
+                const updatedInventory = [...inventory, ...newItems];
+                setInventory(updatedInventory);
+                saveToStorage('inventory-data', updatedInventory);
+
+                addToHistory('Importación masiva', `${currentUser.name} importó ${imported} productos`, currentUser);
+                checkStockAlerts(updatedInventory);
+
+                alert(`✅ Importación completada:\n\n✓ ${imported} productos importados\n${errors > 0 ? `✗ ${errors} filas con errores` : ''}`);
+
+              } catch (error) {
+                console.error('Error:', error);
+                alert('❌ Error al importar el archivo. Verifica el formato.');
+              }
+            };
+            reader.readAsArrayBuffer(file);
+            e.target.value = '';
+          };
+
+          const filteredInventory = inventory.filter(item =>
+            item.modelo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            item.ubicacion.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (item.equipo && item.equipo.toLowerCase().includes(searchTerm.toLowerCase()))
+          );
+
+          const getLowStockItems = () => {
+            return inventory.filter(item => parseInt(item.cantidad) <= (parseInt(item.stockMinimo) || 10));
+          };
+
+          const getCriticalStockItems = () => {
+            return inventory.filter(item => parseInt(item.cantidad) <= ((parseInt(item.stockMinimo) || 10) * 0.5));
+          };
+
+          const getStats = () => {
+            // Total de registros (cada ubicación es un registro separado)
+            const totalRecords = inventory.length;
+            
+            // Suma de todas las cantidades (puede haber mismo modelo en varias ubicaciones)
+            const totalQuantity = inventory.reduce((sum, item) => sum + parseInt(item.cantidad), 0);
+            
+            // Items con stock bajo
+            const lowStock = getLowStockItems().length;
+            const critical = getCriticalStockItems().length;
+            
+            // Ubicaciones únicas
+            const locations = [...new Set(inventory.map(i => i.ubicacion))].length;
+            
+            // Modelos únicos (sin importar ubicación)
+            const uniqueModels = [...new Set(inventory.map(i => i.modelo))].length;
+
+            return { 
+              totalRecords,     // Total de registros individuales
+              totalQuantity,    // Suma de todas las cantidades
+              uniqueModels,     // Modelos únicos
+              lowStock, 
+              critical, 
+              locations 
+            };
+          };
+
+          // ==================== VISTAS ====================
+          if (view === 'login') {
+            return (
+              <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
+                <div className="bg-slate-800/50 backdrop-blur-xl rounded-2xl shadow-2xl p-8 w-full max-w-md border border-slate-700">
+                  <div className="flex flex-col items-center mb-8">
+                    <div className="bg-blue-600 p-4 rounded-full mb-4">
+                      <Package className="w-10 h-10" />
+                    </div>
+                    <h1 className="text-3xl font-bold text-white mb-2">Sistema de Inventario</h1>
+                    <p className="text-slate-400">Inicia sesión para continuar</p>
+                  </div>
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Email</label>
+                      <input type="email" name="email" required
+                        className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="tu@email.com" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Contraseña</label>
+                      <input type="password" name="password" required
+                        className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="••••••••" />
+                    </div>
+                    <button type="submit"
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition">
+                      Iniciar Sesión
+                    </button>
+                  </form>
+                  <div className="mt-6 text-center">
+                    <button onClick={() => setView('register')}
+                      className="text-blue-400 hover:text-blue-300 text-sm">
+                      ¿No tienes cuenta? Solicitar acceso
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          if (view === 'register') {
+            return (
+              <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
+                <div className="bg-slate-800/50 backdrop-blur-xl rounded-2xl shadow-2xl p-8 w-full max-w-md border border-slate-700">
+                  <h1 className="text-3xl font-bold text-white mb-6 text-center">Solicitar Acceso</h1>
+                  <form onSubmit={handleRegister} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Nombre Completo *</label>
+                      <input type="text" name="name" required
+                        className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Juan Pérez" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Email *</label>
+                      <input type="email" name="email" required
+                        className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="tu@email.com" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Contraseña *</label>
+                      <input type="password" name="password" required
+                        className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="••••••••" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Comentario</label>
+                      <textarea name="comment" rows="3"
+                        className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Motivo de solicitud..."></textarea>
+                    </div>
+                    <button type="submit"
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition">
+                      Solicitar Acceso
+                    </button>
+                  </form>
+                  <div className="mt-6 text-center">
+                    <button onClick={() => setView('login')}
+                      className="text-blue-400 hover:text-blue-300 text-sm">
+                      Volver al inicio de sesión
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          if (view === 'pending') {
+            return (
+              <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
+                <div className="bg-slate-800/50 backdrop-blur-xl rounded-2xl shadow-2xl p-8 w-full max-w-md border border-slate-700 text-center">
+                  <Clock />
+                  <h1 className="text-2xl font-bold text-white mb-4 mt-4">Solicitud Enviada</h1>
+                  <p className="text-slate-300 mb-6">
+                    Tu solicitud ha sido enviada. Recibirás un correo cuando sea aprobada.
+                  </p>
+                  <button onClick={() => setView('login')}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold">
+                    Volver al inicio
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          const stats = getStats();
+          const lowStockItems = getLowStockItems();
+          const criticalItems = getCriticalStockItems();
+
+          // ==================== DASHBOARD ====================
+          return (
+            <div className={`min-h-screen ${darkMode ? 'bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900' : 'bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900'}`}>
+              <header className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl border-b ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-blue-600 p-2 rounded-lg">
+                      <Package className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h1 className="text-xl font-bold text-white">Sistema de Inventario</h1>
+                      <p className="text-sm text-slate-400">{currentUser?.name}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button onClick={toggleDarkMode}
+                      className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm">
+                      {darkMode ? <Sun /> : <Moon />}
+                    </button>
+                    {currentUser?.role === 'admin' && (
+                      <>
+                        <button onClick={() => setShowDashboard(!showDashboard)}
+                          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm">
+                          <BarChart /> Dashboard
+                        </button>
+                        <button onClick={() => setShowHistory(!showHistory)}
+                          className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm">
+                          <History /> Historial
+                        </button>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleImportExcel}
+                      accept=".xlsx,.xls"
+                      style={{ display: 'none' }}
+                    />
+                    <button onClick={() => fileInputRef.current.click()}
+                      className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm">
+                      <Upload /> Importar
+                    </button>
+                    <button onClick={exportToExcel}
+                      className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm">
+                      <Download /> Exportar
+                    </button>
+                    <button onClick={handleLogout}
+                      className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">
+                      <LogOut /> Salir
+                    </button>
+                  </div>
+                </div>
+              </header>
+
+              <div className="max-w-7xl mx-auto p-4 space-y-6">
+                {/* DASHBOARD DE ESTADÍSTICAS */}
+                {currentUser?.role === 'admin' && showDashboard && (
+                  <div className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl rounded-xl p-6 border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                        <BarChart /> Dashboard de Estadísticas
+                      </h2>
+                      <button onClick={() => setShowDashboard(false)}
+                        className="text-slate-400 hover:text-white">
+                        <XCircle />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                      <div className="bg-blue-600/20 border border-blue-500 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-blue-300 text-sm">Registros Totales</p>
+                            <p className="text-3xl font-bold text-white">{stats.totalRecords}</p>
+                            <p className="text-blue-200 text-xs mt-1">{stats.uniqueModels} modelos únicos</p>
+                          </div>
+                          <Package className="w-12 h-12 text-blue-400" />
+                        </div>
+                      </div>
+
+                      <div className="bg-green-600/20 border border-green-500 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-green-300 text-sm">Cantidad Total</p>
+                            <p className="text-3xl font-bold text-white">{stats.totalQuantity}</p>
+                            <p className="text-green-200 text-xs mt-1">Suma de todas las unidades</p>
+                          </div>
+                          <TrendingUp className="w-12 h-12 text-green-400" />
+                        </div>
+                      </div>
+
+                      <div className="bg-yellow-600/20 border border-yellow-500 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-yellow-300 text-sm">Stock Bajo</p>
+                            <p className="text-3xl font-bold text-white">{stats.lowStock}</p>
+                            <p className="text-yellow-200 text-xs mt-1">Ubicaciones afectadas</p>
+                          </div>
+                          <AlertTriangle className="w-12 h-12 text-yellow-400" />
+                        </div>
+                      </div>
+
+                      <div className="bg-red-600/20 border border-red-500 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-red-300 text-sm">Crítico</p>
+                            <p className="text-3xl font-bold text-white">{stats.critical}</p>
+                            <p className="text-red-200 text-xs mt-1">Requiere atención inmediata</p>
+                          </div>
+                          <TrendingDown className="w-12 h-12 text-red-400" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {lowStockItems.length > 0 && (
+                      <div className="bg-yellow-900/30 border-2 border-yellow-500 rounded-lg p-6 mb-6 stock-alert">
+                        <h3 className="text-xl font-bold text-yellow-300 mb-4 flex items-center gap-2">
+                          <AlertTriangle /> ⚠️ Productos con Stock Bajo
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {lowStockItems.map(item => (
+                            <div key={item.id} className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border ${parseInt(item.cantidad) <= ((parseInt(item.stockMinimo) || 10) * 0.5) ? 'border-red-500' : 'border-yellow-500'}`}>
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <p className="text-white font-bold">{item.modelo}</p>
+                                  <p className="text-slate-400 text-sm flex items-center gap-1">
+                                    <MapPin /> {item.ubicacion}
+                                  </p>
+                                  {item.equipo && (
+                                    <p className="text-slate-500 text-xs">Equipo: {item.equipo}</p>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <p className={`text-2xl font-bold ${parseInt(item.cantidad) <= ((parseInt(item.stockMinimo) || 10) * 0.5) ? 'text-red-400' : 'text-yellow-400'}`}>
+                                    {item.cantidad}
+                                  </p>
+                                  <p className="text-slate-400 text-xs">Min: {item.stockMinimo || 10}</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <div className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-6 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                        <h3 className="text-lg font-bold text-white mb-4">📊 Top 5 Mayor Stock</h3>
+                        <div className="space-y-3">
+                          {[...inventory].sort((a, b) => parseInt(b.cantidad) - parseInt(a.cantidad)).slice(0, 5).map((item, i) => (
+                            <div key={item.id} className="flex items-center justify-between">
+                              <div className="flex items-center gap-3 flex-1">
+                                <span className="text-2xl font-bold text-blue-400">#{i + 1}</span>
+                                <div>
+                                  <p className="text-white font-semibold">{item.modelo}</p>
+                                  <p className="text-slate-400 text-sm flex items-center gap-1">
+                                    <MapPin /> {item.ubicacion}
+                                  </p>
+                                </div>
+                              </div>
+                              <span className="text-xl font-bold text-green-400">{item.cantidad}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-6 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                        <h3 className="text-lg font-bold text-white mb-4">📍 Ubicaciones ({stats.locations})</h3>
+                        <div className="space-y-3">
+                          {[...new Set(inventory.map(i => i.ubicacion))].slice(0, 5).map((loc, i) => {
+                            const count = inventory.filter(item => item.ubicacion === loc).length;
+                            const totalQty = inventory.filter(item => item.ubicacion === loc).reduce((sum, item) => sum + parseInt(item.cantidad), 0);
+                            return (
+                              <div key={i} className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-white font-semibold">{loc}</p>
+                                  <p className="text-slate-400 text-xs">{totalQty} unidades totales</p>
+                                </div>
+                                <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-semibold">{count} items</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* HISTORIAL */}
+                {currentUser?.role === 'admin' && showHistory && (
+                  <div className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl rounded-xl p-6 border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                        <History /> Historial de Cambios
+                      </h2>
+                      <button onClick={() => setShowHistory(false)}
+                        className="text-slate-400 hover:text-white">
+                        <XCircle />
+                      </button>
+                    </div>
+                    <div className="max-h-96 overflow-y-auto space-y-2">
+                      {changeHistory.length === 0 ? (
+                        <p className="text-slate-400 text-center py-8">No hay historial disponible</p>
+                      ) : (
+                        changeHistory.map(entry => (
+                          <div key={entry.id} className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                            <p className="text-white font-semibold">{entry.action}</p>
+                            <p className="text-slate-300 text-sm mt-1">{entry.details}</p>
+                            <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
+                              <span>👤 {entry.user}</span>
+                              <span>📧 {entry.userEmail}</span>
+                              <span>🕐 {entry.timestamp}</span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* SOLICITUDES DE USUARIOS */}
+                {currentUser?.role === 'admin' && pendingUsers.length > 0 && (
+                  <div className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl rounded-xl p-6 border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                    <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                      <Bell /> Solicitudes de Cuenta ({pendingUsers.length})
+                    </h2>
+                    <div className="space-y-3">
+                      {pendingUsers.map(user => (
+                        <div key={user.id} className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                          <div className="flex items-start justify-between gap-4 flex-wrap">
+                            <div className="flex-1">
+                              <p className="text-white font-semibold">{user.name}</p>
+                              <p className="text-slate-400 text-sm">{user.email}</p>
+                              {user.comment && (
+                                <p className="text-slate-300 text-sm mt-2 italic">💬 "{user.comment}"</p>
+                              )}
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={() => approveUser(user.id)}
+                                className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm">
+                                <CheckCircle /> Aprobar
+                              </button>
+                              <button onClick={() => rejectUser(user.id)}
+                                className="flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm">
+                                <XCircle /> Rechazar
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* SOLICITUDES DE MATERIAL */}
+                {currentUser?.role === 'admin' && pendingMaterials.length > 0 && (
+                  <div className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl rounded-xl p-6 border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                    <h2 className="text-xl font-bold text-white mb-4">📄 Solicitudes de Material ({pendingMaterials.length})</h2>
+                    <div className="space-y-3">
+                      {pendingMaterials.map(material => (
+                        <div key={material.id} className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                          <div className="flex items-start justify-between gap-4 flex-wrap">
+                            <div className="flex-1">
+                              <p className="text-white font-bold text-lg">{material.modelo}</p>
+                              <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
+                                <p className="text-slate-300">📦 Equipo: {material.equipo || '-'}</p>
+                                <p className="text-slate-300">🔢 Cantidad: {material.cantidad}</p>
+                                <p className="text-slate-300 flex items-center gap-1">
+                                  <MapPin /> Ubicación: <span className="text-blue-400">{material.ubicacion}</span>
+                                </p>
+                                <p className="text-slate-300">⚙️ Op. Actual: {material.operacionActual || '-'}</p>
+                              </div>
+                              <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
+                                <span>👤 {material.requestedBy}</span>
+                                <span>🕐 {material.requestDate}</span>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={() => approveMaterial(material.id)}
+                                className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm">
+                                <CheckCircle /> Aprobar
+                              </button>
+                              <button onClick={() => rejectMaterial(material.id)}
+                                className="flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm">
+                                <XCircle /> Rechazar
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* FORMULARIO */}
+                <div className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl rounded-xl p-6 border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                  <h2 className="text-xl font-bold text-white mb-4">
+                    {editingItem ? '✏️ Editar Material' : '➕ Solicitar Agregar Material'}
+                  </h2>
+                  <form onSubmit={editingItem ? handleUpdateMaterial : handleRequestMaterial} 
+                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Modelo *</label>
+                      <input type="text" value={formData.modelo}
+                        onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
+                        className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
+                        placeholder="ABC-123" required />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Equipo</label>
+                      <input type="text" value={formData.equipo}
+                        onChange={(e) => setFormData({ ...formData, equipo: e.target.value })}
+                        className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
+                        placeholder="ICT, ROUTER, STITCH" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Cantidad *</label>
+                      <input type="number" value={formData.cantidad}
+                        onChange={(e) => setFormData({ ...formData, cantidad: e.target.value })}
+                        className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
+                        placeholder="0" required />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Ubicación *</label>
+                      <input type="text" value={formData.ubicacion}
+                        onChange={(e) => setFormData({ ...formData, ubicacion: e.target.value })}
+                        className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
+                        placeholder="Rack A-5" required />
+                    </div>
+                    {/* Stock Mínimo solo visible para admin al editar */}
+                    {currentUser?.role === 'admin' && editingItem && (
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          Stock Mínimo 🔒 <span className="text-xs text-yellow-400">(Solo Admin)</span>
+                        </label>
+                        <input type="number" value={formData.stockMinimo}
+                          onChange={(e) => setFormData({ ...formData, stockMinimo: e.target.value })}
+                          className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border border-yellow-600 rounded-lg text-white focus:ring-2 focus:ring-yellow-500`}
+                          placeholder="10" />
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Op. Actual</label>
+                      <input type="text" value={formData.operacionActual}
+                        onChange={(e) => setFormData({ ...formData, operacionActual: e.target.value })}
+                        className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
+                        placeholder="800, 805, 900, 200" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Próxima Op.</label>
+                      <input type="text" value={formData.proximaOperacion}
+                        onChange={(e) => setFormData({ ...formData, proximaOperacion: e.target.value })}
+                        className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
+                        placeholder="800, 805, 900, 200" />
+                    </div>
+                    <div className="md:col-span-2 lg:col-span-3">
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Comentario</label>
+                      <textarea value={formData.comentario}
+                        onChange={(e) => setFormData({ ...formData, comentario: e.target.value })}
+                        className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
+                        placeholder="Notas..." rows="2"></textarea>
+                    </div>
+                    <div className="md:col-span-2 lg:col-span-3 flex gap-2">
+                      <button type="submit"
+                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold">
+                        <Plus /> {editingItem ? 'Actualizar' : 'Solicitar'}
+                      </button>
+                      {editingItem && (
+                        <button type="button" onClick={() => {
+                          setEditingItem(null);
+                          setFormData({
+                            modelo: '', equipo: '', cantidad: '', ubicacion: '', 
+                            operacionActual: '', proximaOperacion: '', comentario: '', stockMinimo: '10'
+                          });
+                        }}
+                          className="bg-slate-600 hover:bg-slate-700 text-white px-6 py-2 rounded-lg font-semibold">
+                          Cancelar
+                        </button>
+                      )}
+                    </div>
+                  </form>
+                </div>
+
+                {/* TABLA DE INVENTARIO */}
+                <div className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl rounded-xl p-6 border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                  <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
+                    <h2 className="text-xl font-bold text-white">📦 Inventario ({inventory.length} registros)</h2>
+                    <div className="relative">
+                      <Search />
+                      <input type="text" value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className={`pl-10 pr-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
+                        placeholder="Buscar..." />
+                    </div>
+                  </div>
+
+                  {filteredInventory.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Package className="w-16 h-16 text-slate-600 mx-auto" />
+                      <p className="text-slate-400 mt-4">No hay items</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className={`border-b ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                            <th className="text-left py-3 px-3 text-slate-300 font-semibold">Modelo</th>
+                            <th className="text-left py-3 px-3 text-slate-300 font-semibold">Equipo</th>
+                            <th className="text-left py-3 px-3 text-slate-300 font-semibold">Cantidad</th>
+                            <th className="text-left py-3 px-3 text-slate-300 font-semibold">Ubicación</th>
+                            <th className="text-left py-3 px-3 text-slate-300 font-semibold">Stock Mín</th>
+                            <th className="text-left py-3 px-3 text-slate-300 font-semibold">Estado</th>
+                            <th className="text-left py-3 px-3 text-slate-300 font-semibold">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredInventory.map((item) => {
+                            const isLow = parseInt(item.cantidad) <= (parseInt(item.stockMinimo) || 10);
+                            const isCritical = parseInt(item.cantidad) <= ((parseInt(item.stockMinimo) || 10) * 0.5);
+                            
+                            return (
+                              <tr key={item.id} className={`border-b ${darkMode ? 'border-slate-700/50' : 'border-slate-700/50'} hover:bg-slate-900/30`}>
+                                <td className="py-3 px-3 text-white font-medium">{item.modelo}</td>
+                                <td className="py-3 px-3 text-slate-300">{item.equipo || '-'}</td>
+                                <td className="py-3 px-3">
+                                  <div className="flex items-center gap-2">
+                                    <button onClick={() => handleAdjustQuantity(item.id, -1)}
+                                      className="w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded flex items-center justify-center text-xs">
+                                      -
+                                    </button>
+                                    <span className={`font-semibold min-w-[30px] text-center ${isCritical ? 'text-red-400' : isLow ? 'text-yellow-400' : 'text-white'}`}>
+                                      {item.cantidad}
+                                    </span>
+                                    <button onClick={() => handleAdjustQuantity(item.id, 1)}
+                                      className="w-6 h-6 bg-green-600 hover:bg-green-700 text-white rounded flex items-center justify-center text-xs">
+                                      +
+                                    </button>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-3">
+                                  <span className="text-blue-400 font-medium flex items-center gap-1">
+                                    <MapPin /> {item.ubicacion}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3 text-slate-400">{item.stockMinimo || 10}</td>
+                                <td className="py-3 px-3">
+                                  {isCritical ? (
+                                    <span className="bg-red-600 text-white px-2 py-1 rounded text-xs font-semibold animate-pulse">
+                                      🔴 CRÍTICO
+                                    </span>
+                                  ) : isLow ? (
+                                    <span className="bg-yellow-600 text-white px-2 py-1 rounded text-xs font-semibold">
+                                      ⚠️ BAJO
+                                    </span>
+                                  ) : (
+                                    <span className="bg-green-600 text-white px-2 py-1 rounded text-xs font-semibold">
+                                      ✓ OK
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-3">
+                                  <div className="flex gap-2">
+                                    <button onClick={() => handleEdit(item)}
+                                      className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded">
+                                      <Edit2 />
+                                    </button>
+                                    {currentUser?.role === 'admin' && (
+                                      <button onClick={() => handleDelete(item.id)}
+                                        className="p-2 bg-red-600 hover:bg-red-700 text-white rounded">
+                                        <Trash2 />
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<InventoryApp />);
+    </script>
+</body>
+</html>
