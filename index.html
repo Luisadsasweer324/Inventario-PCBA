@@ -67,15 +67,15 @@
 
     <script>
         // ==================== CONFIGURACIÓN DE FIREBASE ====================
-const firebaseConfig = {
-  apiKey: "AIzaSyBdaZe_ep_B25I5pYtJLap46-_xJmYupPI",
-  authDomain: "inventario-empresa-3455c.firebaseapp.com",
-  projectId: "inventario-empresa-3455c",
-  storageBucket: "inventario-empresa-3455c.firebasestorage.app",
-  messagingSenderId: "556200473276",
-  appId: "1:556200473276:web:b9fd510b9b52cade59d6b9",
-  measurementId: "G-FF2332NPFS"
-};
+        const firebaseConfig = {
+            apiKey: "TU_API_KEY",
+            authDomain: "TU_PROJECT_ID.firebaseapp.com",
+            databaseURL: "https://TU_PROJECT_ID-default-rtdb.firebaseio.com",
+            projectId: "TU_PROJECT_ID",
+            storageBucket: "TU_PROJECT_ID.appspot.com",
+            messagingSenderId: "TU_SENDER_ID",
+            appId: "TU_APP_ID"
+        };
 
         const isFirebaseConfigured = firebaseConfig.apiKey !== "TU_API_KEY";
         let database = null;
@@ -370,6 +370,72 @@ const firebaseConfig = {
             </svg>
         );
 
+        const Filter = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+            </svg>
+        );
+
+        const Calendar = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+        );
+
+        const Activity = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+        );
+
+        const GitBranch = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="6" y1="3" x2="6" y2="15"/>
+                <circle cx="18" cy="6" r="3"/>
+                <circle cx="6" cy="18" r="3"/>
+                <path d="M18 9a9 9 0 0 1-9 9"/>
+            </svg>
+        );
+
+        const PieChart = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>
+                <path d="M22 12A10 10 0 0 0 12 2v10z"/>
+            </svg>
+        );
+
+        const Clock2 = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+            </svg>
+        );
+
+        const TrendingUpIcon = () => (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                <polyline points="17 6 23 6 23 12"/>
+            </svg>
+        );
+
+        const BarChart2 = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="20" x2="18" y2="10"/>
+                <line x1="12" y1="20" x2="12" y2="4"/>
+                <line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
+        );
+
+        const LineChart = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 17 9 11 13 15 21 7"/>
+                <polyline points="14 7 21 7 21 14"/>
+            </svg>
+        );
+
         // ==================== COMPONENTE PRINCIPAL ====================
         function InventoryApp() {
           const [currentUser, setCurrentUser] = useState(null);
@@ -380,8 +446,23 @@ const firebaseConfig = {
           const [showHistory, setShowHistory] = useState(false);
           const [showDashboard, setShowDashboard] = useState(false);
           const [showUserManager, setShowUserManager] = useState(false);
+          const [showAdvancedAnalytics, setShowAdvancedAnalytics] = useState(false);
+          const [showProcessFlow, setShowProcessFlow] = useState(false);
+          const [showWeeklyStats, setShowWeeklyStats] = useState(false);
           const [darkMode, setDarkMode] = useState(false);
           const [connectionStatus, setConnectionStatus] = useState(firebaseInitialized ? 'connected' : 'local');
+          
+          // Filtros de historial
+          const [historyFilterUser, setHistoryFilterUser] = useState('');
+          const [historyFilterStartDate, setHistoryFilterStartDate] = useState('');
+          const [historyFilterEndDate, setHistoryFilterEndDate] = useState('');
+          const [processFlowSearch, setProcessFlowSearch] = useState('');
+          
+          // Sistema de semanas
+          const [selectedWeek, setSelectedWeek] = useState('');
+          const [weekCompare1, setWeekCompare1] = useState('');
+          const [weekCompare2, setWeekCompare2] = useState('');
+          
           const [formData, setFormData] = useState({
             modelo: '', equipo: '', cantidad: '', ubicacion: '', 
             operacionActual: '', proximaOperacion: '', comentario: '', stockMinimo: '10'
@@ -954,6 +1035,248 @@ const firebaseConfig = {
             };
           };
 
+          // ==================== FUNCIONES DE ANÁLISIS AVANZADO ====================
+          
+          // Obtener número de semana del año
+          const getWeekNumber = (date) => {
+            const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+            const dayNum = d.getUTCDay() || 7;
+            d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+          };
+
+          // Obtener semana actual
+          const getCurrentWeek = () => {
+            const now = new Date();
+            return {
+              week: getWeekNumber(now),
+              year: now.getFullYear(),
+              display: `Semana ${getWeekNumber(now)} - ${now.getFullYear()}`
+            };
+          };
+
+          // Obtener todas las semanas con datos
+          const getAllWeeks = () => {
+            const weeksMap = {};
+            
+            changeHistory.forEach(entry => {
+              if (entry.date) {
+                const date = new Date(entry.date);
+                const week = getWeekNumber(date);
+                const year = date.getFullYear();
+                const key = `${year}-W${week}`;
+                
+                if (!weeksMap[key]) {
+                  weeksMap[key] = {
+                    week,
+                    year,
+                    key,
+                    display: `Semana ${week} - ${year}`,
+                    entries: [],
+                    stats: {
+                      total: 0,
+                      byOperation: {},
+                      byUser: {},
+                      entriesCount: 0,
+                      exitsCount: 0,
+                      editsCount: 0
+                    }
+                  };
+                }
+                
+                weeksMap[key].entries.push(entry);
+                weeksMap[key].stats.total++;
+                
+                // Contar por tipo
+                if (entry.action.includes('agregado') || entry.action.includes('Aprobación') || entry.action.includes('Importación')) {
+                  weeksMap[key].stats.entriesCount++;
+                } else if (entry.action.includes('eliminado')) {
+                  weeksMap[key].stats.exitsCount++;
+                } else if (entry.action.includes('editado') || entry.action.includes('ajustó')) {
+                  weeksMap[key].stats.editsCount++;
+                }
+                
+                // Contar por usuario
+                const userKey = entry.userEmail || entry.user;
+                weeksMap[key].stats.byUser[userKey] = (weeksMap[key].stats.byUser[userKey] || 0) + 1;
+                
+                // Contar por operación
+                const operation = entry.action;
+                weeksMap[key].stats.byOperation[operation] = (weeksMap[key].stats.byOperation[operation] || 0) + 1;
+              }
+            });
+            
+            // Ordenar por semana más reciente
+            return Object.values(weeksMap).sort((a, b) => {
+              if (a.year !== b.year) return b.year - a.year;
+              return b.week - a.week;
+            });
+          };
+
+          // Obtener estadísticas de semana específica
+          const getWeekStats = (weekKey) => {
+            const weeks = getAllWeeks();
+            return weeks.find(w => w.key === weekKey);
+          };
+
+          // Obtener datos para gráfica acumulativa
+          const getWeeklyCumulativeData = () => {
+            const weeks = getAllWeeks().reverse(); // Más antigua a más reciente
+            let cumulative = 0;
+            
+            return weeks.map(week => {
+              cumulative += week.stats.total;
+              return {
+                ...week,
+                cumulative,
+                weekLabel: `S${week.week}`
+              };
+            });
+          };
+
+          // Comparar semanas
+          const compareWeeks = (week1Key, week2Key) => {
+            const week1 = getWeekStats(week1Key);
+            const week2 = getWeekStats(week2Key);
+            
+            if (!week1 || !week2) return null;
+            
+            return {
+              week1: week1.display,
+              week2: week2.display,
+              totalDiff: week1.stats.total - week2.stats.total,
+              entriesDiff: week1.stats.entriesCount - week2.stats.entriesCount,
+              exitsDiff: week1.stats.exitsCount - week2.stats.exitsCount,
+              editsDiff: week1.stats.editsCount - week2.stats.editsCount,
+              percentChange: ((week1.stats.total - week2.stats.total) / week2.stats.total * 100).toFixed(1)
+            };
+          };
+          
+          // Filtrar historial
+          const getFilteredHistory = () => {
+            return changeHistory.filter(entry => {
+              const matchUser = !historyFilterUser || 
+                entry.userEmail.toLowerCase().includes(historyFilterUser.toLowerCase()) ||
+                entry.user.toLowerCase().includes(historyFilterUser.toLowerCase());
+              
+              const matchDate = () => {
+                if (!historyFilterStartDate && !historyFilterEndDate) return true;
+                const entryDate = new Date(entry.date);
+                const startDate = historyFilterStartDate ? new Date(historyFilterStartDate) : null;
+                const endDate = historyFilterEndDate ? new Date(historyFilterEndDate + 'T23:59:59') : null;
+                
+                if (startDate && endDate) {
+                  return entryDate >= startDate && entryDate <= endDate;
+                } else if (startDate) {
+                  return entryDate >= startDate;
+                } else if (endDate) {
+                  return entryDate <= endDate;
+                }
+                return true;
+              };
+              
+              return matchUser && matchDate();
+            });
+          };
+
+          // Obtener actividad por usuario (entradas/salidas)
+          const getUserActivity = (period = 'month') => {
+            const now = new Date();
+            const periodStart = new Date();
+            
+            if (period === 'week') {
+              periodStart.setDate(now.getDate() - 7);
+            } else if (period === 'month') {
+              periodStart.setMonth(now.getMonth() - 1);
+            }
+            
+            const activityMap = {};
+            
+            changeHistory.forEach(entry => {
+              const entryDate = new Date(entry.date);
+              if (entryDate >= periodStart) {
+                if (!activityMap[entry.userEmail]) {
+                  activityMap[entry.userEmail] = {
+                    name: entry.user,
+                    email: entry.userEmail,
+                    entries: 0,
+                    exits: 0,
+                    edits: 0,
+                    total: 0
+                  };
+                }
+                
+                if (entry.action.includes('agregado') || entry.action.includes('Aprobación') || entry.action.includes('Importación')) {
+                  activityMap[entry.userEmail].entries++;
+                } else if (entry.action.includes('eliminado')) {
+                  activityMap[entry.userEmail].exits++;
+                } else if (entry.action.includes('editado') || entry.action.includes('ajustó')) {
+                  activityMap[entry.userEmail].edits++;
+                }
+                
+                activityMap[entry.userEmail].total++;
+              }
+            });
+            
+            return Object.values(activityMap).sort((a, b) => b.total - a.total);
+          };
+
+          // Obtener flujo de proceso por modelo
+          const getProcessFlow = (modelo) => {
+            if (!modelo) return [];
+            
+            const items = inventory.filter(item => 
+              item.modelo.toLowerCase() === modelo.toLowerCase()
+            );
+            
+            const flow = [];
+            items.forEach(item => {
+              if (item.operacionActual) {
+                flow.push({
+                  step: item.operacionActual,
+                  nextStep: item.proximaOperacion || 'Finalizado',
+                  location: item.ubicacion,
+                  quantity: item.cantidad,
+                  equipment: item.equipo
+                });
+              }
+            });
+            
+            return flow;
+          };
+
+          // Material con más tiempo detenido
+          const getStagnantMaterials = () => {
+            const now = new Date();
+            
+            const materialsWithActivity = inventory.map(item => {
+              // Buscar última actividad de este item
+              const lastActivity = changeHistory
+                .filter(entry => 
+                  entry.details.toLowerCase().includes(item.modelo.toLowerCase()) &&
+                  (entry.details.toLowerCase().includes(item.ubicacion.toLowerCase()) ||
+                   entry.action.includes('ajustó') || 
+                   entry.action.includes('editado'))
+                )
+                .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+              
+              const lastActivityDate = lastActivity ? new Date(lastActivity.date) : new Date(item.fechaRegistro || now);
+              const daysSinceActivity = Math.floor((now - lastActivityDate) / (1000 * 60 * 60 * 24));
+              
+              return {
+                ...item,
+                lastActivity: lastActivityDate,
+                daysSinceActivity,
+                lastAction: lastActivity?.action || 'Sin actividad'
+              };
+            });
+            
+            return materialsWithActivity
+              .sort((a, b) => b.daysSinceActivity - a.daysSinceActivity)
+              .slice(0, 10);
+          };
+
           const ConnectionIndicator = () => (
             <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs ${
               connectionStatus === 'connected' 
@@ -1090,6 +1413,7 @@ const firebaseConfig = {
                       <p className="text-sm text-slate-400">
                         {currentUser?.name} 
                         {currentUser?.role === 'admin' && <span className="ml-2 text-yellow-400">👑 Admin</span>}
+                        <span className="ml-2 text-blue-400">📅 {getCurrentWeek().display}</span>
                       </p>
                     </div>
                   </div>
@@ -1112,6 +1436,18 @@ const firebaseConfig = {
                         <button onClick={() => setShowHistory(!showHistory)}
                           className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm">
                           <History /> Historial
+                        </button>
+                        <button onClick={() => setShowAdvancedAnalytics(!showAdvancedAnalytics)}
+                          className="flex items-center gap-2 bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg text-sm">
+                          <Activity /> Analytics
+                        </button>
+                        <button onClick={() => setShowProcessFlow(!showProcessFlow)}
+                          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm">
+                          <GitBranch /> Flujo
+                        </button>
+                        <button onClick={() => setShowWeeklyStats(!showWeeklyStats)}
+                          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm">
+                          <Calendar /> Semanas
                         </button>
                         <input
                           type="file"
@@ -1330,7 +1666,497 @@ const firebaseConfig = {
                   </div>
                 )}
 
-                {/* HISTORIAL */}
+                {/* ANALYTICS AVANZADO */}
+                {currentUser?.role === 'admin' && showAdvancedAnalytics && (
+                  <div className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl rounded-xl p-6 border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                        <Activity /> Analytics Avanzado
+                      </h2>
+                      <button onClick={() => setShowAdvancedAnalytics(false)}
+                        className="text-slate-400 hover:text-white">
+                        <XCircle />
+                      </button>
+                    </div>
+
+                    {/* ACTIVIDAD POR USUARIO */}
+                    <div className="mb-8">
+                      <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        <PieChart /> Actividad por Usuario (Último Mes)
+                      </h3>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Gráfica de barras visual */}
+                        <div className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-6 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                          <h4 className="text-white font-semibold mb-4">📊 Registros Totales</h4>
+                          <div className="space-y-3">
+                            {getUserActivity('month').map((user, i) => {
+                              const maxActivity = Math.max(...getUserActivity('month').map(u => u.total));
+                              const barWidth = (user.total / maxActivity) * 100;
+                              return (
+                                <div key={i}>
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-sm text-slate-300">{user.name}</span>
+                                    <span className="text-sm font-bold text-white">{user.total}</span>
+                                  </div>
+                                  <div className="w-full bg-slate-700 rounded-full h-4 overflow-hidden">
+                                    <div 
+                                      className="bg-gradient-to-r from-blue-500 to-purple-500 h-full rounded-full transition-all duration-500"
+                                      style={{ width: `${barWidth}%` }}
+                                    ></div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Tabla detallada */}
+                        <div className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-6 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                          <h4 className="text-white font-semibold mb-4">📈 Detalle de Operaciones</h4>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b border-slate-700">
+                                  <th className="text-left py-2 text-slate-400">Usuario</th>
+                                  <th className="text-center py-2 text-green-400">Entradas</th>
+                                  <th className="text-center py-2 text-red-400">Salidas</th>
+                                  <th className="text-center py-2 text-blue-400">Ediciones</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {getUserActivity('month').map((user, i) => (
+                                  <tr key={i} className="border-b border-slate-700/50">
+                                    <td className="py-2 text-white">{user.name}</td>
+                                    <td className="text-center text-green-400 font-semibold">{user.entries}</td>
+                                    <td className="text-center text-red-400 font-semibold">{user.exits}</td>
+                                    <td className="text-center text-blue-400 font-semibold">{user.edits}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* MATERIAL DETENIDO */}
+                    <div>
+                      <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        <Clock2 /> Material con Más Tiempo Detenido
+                      </h3>
+                      <div className={`${darkMode ? 'bg-red-900/20' : 'bg-red-900/20'} border-2 border-red-500 rounded-lg p-6`}>
+                        <p className="text-red-300 mb-4">⚠️ Productos sin movimiento en los últimos días</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {getStagnantMaterials().map((item, i) => (
+                            <div key={i} className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border ${
+                              item.daysSinceActivity > 30 ? 'border-red-500' : 
+                              item.daysSinceActivity > 15 ? 'border-yellow-500' : 
+                              'border-slate-700'
+                            }`}>
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <p className="text-white font-bold">{item.modelo}</p>
+                                  <p className="text-slate-400 text-sm flex items-center gap-1">
+                                    <MapPin /> {item.ubicacion}
+                                  </p>
+                                  <p className="text-slate-500 text-xs mt-1">
+                                    Última actividad: {item.lastAction}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className={`text-3xl font-bold ${
+                                    item.daysSinceActivity > 30 ? 'text-red-400' : 
+                                    item.daysSinceActivity > 15 ? 'text-yellow-400' : 
+                                    'text-slate-400'
+                                  }`}>
+                                    {item.daysSinceActivity}
+                                  </p>
+                                  <p className="text-xs text-slate-400">días</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* FLUJO DE PROCESOS */}
+                {currentUser?.role === 'admin' && showProcessFlow && (
+                  <div className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl rounded-xl p-6 border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                        <GitBranch /> Flujo de Procesos
+                      </h2>
+                      <button onClick={() => setShowProcessFlow(false)}
+                        className="text-slate-400 hover:text-white">
+                        <XCircle />
+                      </button>
+                    </div>
+
+                    {/* Buscador de modelo */}
+                    <div className="mb-6">
+                      <label className="block text-slate-300 mb-2 font-semibold">Buscar por Modelo:</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={processFlowSearch}
+                          onChange={(e) => setProcessFlowSearch(e.target.value)}
+                          placeholder="Escribe el modelo para ver su flujo..."
+                          className={`w-full px-4 py-3 pl-10 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white`}
+                        />
+                        <Search />
+                      </div>
+                    </div>
+
+                    {/* Diagrama de flujo */}
+                    <div className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-6 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                      <h3 className="text-white font-semibold mb-4">🔄 Diagrama de Flujo</h3>
+                      
+                      {(() => {
+                        const flow = getProcessFlow(processFlowSearch);
+                        
+                        if (!processFlowSearch) {
+                          return (
+                            <div className="text-center py-12">
+                              <GitBranch className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                              <p className="text-slate-400">Busca un modelo para ver su flujo de procesos</p>
+                            </div>
+                          );
+                        }
+                        
+                        if (flow.length === 0) {
+                          return (
+                            <div className="text-center py-12">
+                              <p className="text-slate-400">No se encontró flujo para el modelo "{processFlowSearch}"</p>
+                              <p className="text-slate-500 text-sm mt-2">Verifica que el modelo exista y tenga operaciones registradas</p>
+                            </div>
+                          );
+                        }
+                        
+                        return (
+                          <div className="space-y-4">
+                            <div className="mb-4 p-3 bg-blue-900/30 border border-blue-500 rounded-lg">
+                              <p className="text-blue-300 text-sm">
+                                📊 Mostrando {flow.length} {flow.length === 1 ? 'paso' : 'pasos'} para <strong>{processFlowSearch}</strong>
+                              </p>
+                            </div>
+                            {flow.map((step, i) => (
+                              <div key={i} className="flex items-center gap-4">
+                                {/* Paso actual */}
+                                <div className="flex-1 bg-blue-600/20 border-2 border-blue-500 rounded-lg p-4">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">
+                                      PASO {i + 1}
+                                    </span>
+                                  </div>
+                                  <p className="text-white font-bold text-lg">{step.step}</p>
+                                  <div className="mt-2 space-y-1 text-sm">
+                                    <p className="text-slate-300">📍 Ubicación: <span className="text-blue-400">{step.location}</span></p>
+                                    <p className="text-slate-300">📦 Cantidad: <span className="text-green-400">{step.quantity}</span></p>
+                                    {step.equipment && (
+                                      <p className="text-slate-300">⚙️ Equipo: <span className="text-yellow-400">{step.equipment}</span></p>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                {/* Flecha */}
+                                {step.nextStep !== 'Finalizado' ? (
+                                  <>
+                                    <div className="flex flex-col items-center">
+                                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-slate-500">
+                                        <line x1="5" y1="12" x2="19" y2="12"/>
+                                        <polyline points="12 5 19 12 12 19"/>
+                                      </svg>
+                                    </div>
+                                    
+                                    {/* Siguiente paso */}
+                                    <div className="flex-1 bg-green-600/20 border-2 border-green-500 rounded-lg p-4">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <span className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">
+                                          SIGUIENTE
+                                        </span>
+                                      </div>
+                                      <p className="text-white font-bold text-lg">{step.nextStep}</p>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="flex-1 bg-gray-600/20 border-2 border-gray-500 rounded-lg p-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <span className="bg-gray-600 text-white px-2 py-1 rounded text-xs font-bold">
+                                        FIN
+                                      </span>
+                                    </div>
+                                    <p className="text-white font-bold text-lg">✓ Proceso Finalizado</p>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* ESTADÍSTICAS SEMANALES */}
+                {currentUser?.role === 'admin' && showWeeklyStats && (
+                  <div className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl rounded-xl p-6 border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                        <Calendar /> Estadísticas Semanales
+                      </h2>
+                      <button onClick={() => setShowWeeklyStats(false)}
+                        className="text-slate-400 hover:text-white">
+                        <XCircle />
+                      </button>
+                    </div>
+
+                    {/* SEMANA ACTUAL */}
+                    <div className="mb-8 p-6 bg-gradient-to-r from-blue-600/20 to-purple-600/20 border-2 border-blue-500 rounded-xl">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="text-2xl font-bold text-white">📅 {getCurrentWeek().display}</h3>
+                          <p className="text-blue-300 text-sm">Semana actual en curso</p>
+                        </div>
+                        <div className="text-right">
+                          {(() => {
+                            const currentWeekData = getAllWeeks()[0];
+                            return currentWeekData ? (
+                              <>
+                                <p className="text-4xl font-bold text-white">{currentWeekData.stats.total}</p>
+                                <p className="text-blue-300 text-sm">Operaciones totales</p>
+                              </>
+                            ) : (
+                              <p className="text-slate-400">Sin datos</p>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                      
+                      {(() => {
+                        const currentWeekData = getAllWeeks()[0];
+                        return currentWeekData ? (
+                          <div className="grid grid-cols-3 gap-4">
+                            <div className="bg-green-600/20 border border-green-500 rounded-lg p-4 text-center">
+                              <p className="text-3xl font-bold text-green-400">{currentWeekData.stats.entriesCount}</p>
+                              <p className="text-green-300 text-sm">Entradas</p>
+                            </div>
+                            <div className="bg-red-600/20 border border-red-500 rounded-lg p-4 text-center">
+                              <p className="text-3xl font-bold text-red-400">{currentWeekData.stats.exitsCount}</p>
+                              <p className="text-red-300 text-sm">Salidas</p>
+                            </div>
+                            <div className="bg-blue-600/20 border border-blue-500 rounded-lg p-4 text-center">
+                              <p className="text-3xl font-bold text-blue-400">{currentWeekData.stats.editsCount}</p>
+                              <p className="text-blue-300 text-sm">Ediciones</p>
+                            </div>
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+
+                    {/* GRÁFICA ACUMULATIVA */}
+                    <div className="mb-8">
+                      <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        <LineChart /> Gráfica Acumulativa por Semana
+                      </h3>
+                      <div className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-6 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                        {(() => {
+                          const data = getWeeklyCumulativeData();
+                          const maxValue = data.length > 0 ? data[data.length - 1].cumulative : 0;
+                          
+                          return data.length > 0 ? (
+                            <div className="space-y-4">
+                              {/* Línea de gráfica visual */}
+                              <div className="relative h-64 flex items-end justify-between gap-2">
+                                {data.map((week, i) => {
+                                  const height = (week.cumulative / maxValue) * 100;
+                                  const color = i === data.length - 1 ? 'bg-blue-500' : 'bg-slate-600';
+                                  
+                                  return (
+                                    <div key={week.key} className="flex-1 flex flex-col items-center justify-end h-full">
+                                      <div className="text-center mb-2">
+                                        <p className="text-xs font-bold text-white">{week.cumulative}</p>
+                                      </div>
+                                      <div 
+                                        className={`w-full ${color} rounded-t transition-all duration-500 hover:bg-blue-400`}
+                                        style={{ height: `${height}%` }}
+                                        title={`${week.display}: ${week.cumulative} operaciones`}
+                                      ></div>
+                                      <div className="mt-2">
+                                        <p className="text-xs text-slate-400 transform -rotate-45 whitespace-nowrap">{week.weekLabel}</p>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              
+                              {/* Resumen */}
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-slate-700">
+                                <div className="text-center">
+                                  <p className="text-2xl font-bold text-white">{data.length}</p>
+                                  <p className="text-sm text-slate-400">Semanas registradas</p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-2xl font-bold text-green-400">{maxValue}</p>
+                                  <p className="text-sm text-slate-400">Total acumulado</p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-2xl font-bold text-blue-400">
+                                    {data.length > 0 ? Math.round(maxValue / data.length) : 0}
+                                  </p>
+                                  <p className="text-sm text-slate-400">Promedio/semana</p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-2xl font-bold text-purple-400">
+                                    {data.length > 1 ? data[data.length - 1].stats.total : 0}
+                                  </p>
+                                  <p className="text-sm text-slate-400">Última semana</p>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-center py-12">
+                              <LineChart className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                              <p className="text-slate-400">No hay datos semanales disponibles</p>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* ESTADÍSTICAS POR OPERACIÓN */}
+                    <div className="mb-8">
+                      <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        <BarChart2 /> Operaciones por Semana
+                      </h3>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {getAllWeeks().slice(0, 6).map((week, index) => (
+                          <div key={week.key} className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border ${
+                            index === 0 ? 'border-blue-500 bg-blue-900/20' : 'border-slate-700'
+                          }`}>
+                            <div className="flex items-center justify-between mb-3">
+                              <div>
+                                <h4 className="text-white font-bold">{week.display}</h4>
+                                {index === 0 && <p className="text-blue-400 text-xs">Actual</p>}
+                              </div>
+                              <div className="text-right">
+                                <p className="text-2xl font-bold text-white">{week.stats.total}</p>
+                                <p className="text-slate-400 text-xs">total</p>
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-green-400">✅ Entradas:</span>
+                                <span className="font-bold text-green-400">{week.stats.entriesCount}</span>
+                              </div>
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-red-400">❌ Salidas:</span>
+                                <span className="font-bold text-red-400">{week.stats.exitsCount}</span>
+                              </div>
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-blue-400">✏️ Ediciones:</span>
+                                <span className="font-bold text-blue-400">{week.stats.editsCount}</span>
+                              </div>
+                            </div>
+                            
+                            {/* Top operaciones */}
+                            <div className="mt-3 pt-3 border-t border-slate-700">
+                              <p className="text-xs text-slate-400 mb-2">Top operaciones:</p>
+                              {Object.entries(week.stats.byOperation)
+                                .sort((a, b) => b[1] - a[1])
+                                .slice(0, 3)
+                                .map(([op, count], i) => (
+                                  <div key={i} className="text-xs text-slate-300 truncate">
+                                    • {op}: <span className="text-white font-semibold">{count}</span>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* COMPARADOR DE SEMANAS */}
+                    <div>
+                      <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        <TrendingUpIcon /> Comparar Semanas
+                      </h3>
+                      <div className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-6 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <label className="block text-sm text-slate-400 mb-2">Semana 1:</label>
+                            <select
+                              value={weekCompare1}
+                              onChange={(e) => setWeekCompare1(e.target.value)}
+                              className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white">
+                              <option value="">Seleccionar semana...</option>
+                              {getAllWeeks().map(week => (
+                                <option key={week.key} value={week.key}>{week.display}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm text-slate-400 mb-2">Semana 2:</label>
+                            <select
+                              value={weekCompare2}
+                              onChange={(e) => setWeekCompare2(e.target.value)}
+                              className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white">
+                              <option value="">Seleccionar semana...</option>
+                              {getAllWeeks().map(week => (
+                                <option key={week.key} value={week.key}>{week.display}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        
+                        {weekCompare1 && weekCompare2 && (() => {
+                          const comparison = compareWeeks(weekCompare1, weekCompare2);
+                          if (!comparison) return null;
+                          
+                          return (
+                            <div className="mt-6 p-4 bg-blue-900/20 border border-blue-500 rounded-lg">
+                              <h4 className="text-white font-bold mb-4">Resultados de Comparación:</h4>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="text-center">
+                                  <p className="text-slate-400 text-xs mb-1">Diferencia Total</p>
+                                  <p className={`text-2xl font-bold ${comparison.totalDiff > 0 ? 'text-green-400' : comparison.totalDiff < 0 ? 'text-red-400' : 'text-slate-400'}`}>
+                                    {comparison.totalDiff > 0 ? '+' : ''}{comparison.totalDiff}
+                                  </p>
+                                  <p className={`text-xs ${comparison.percentChange > 0 ? 'text-green-400' : comparison.percentChange < 0 ? 'text-red-400' : 'text-slate-400'}`}>
+                                    {comparison.percentChange > 0 ? '+' : ''}{comparison.percentChange}%
+                                  </p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-slate-400 text-xs mb-1">Entradas</p>
+                                  <p className={`text-2xl font-bold ${comparison.entriesDiff > 0 ? 'text-green-400' : comparison.entriesDiff < 0 ? 'text-red-400' : 'text-slate-400'}`}>
+                                    {comparison.entriesDiff > 0 ? '+' : ''}{comparison.entriesDiff}
+                                  </p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-slate-400 text-xs mb-1">Salidas</p>
+                                  <p className={`text-2xl font-bold ${comparison.exitsDiff > 0 ? 'text-green-400' : comparison.exitsDiff < 0 ? 'text-red-400' : 'text-slate-400'}`}>
+                                    {comparison.exitsDiff > 0 ? '+' : ''}{comparison.exitsDiff}
+                                  </p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-slate-400 text-xs mb-1">Ediciones</p>
+                                  <p className={`text-2xl font-bold ${comparison.editsDiff > 0 ? 'text-green-400' : comparison.editsDiff < 0 ? 'text-red-400' : 'text-slate-400'}`}>
+                                    {comparison.editsDiff > 0 ? '+' : ''}{comparison.editsDiff}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* HISTORIAL CON FILTROS */}
                 {currentUser?.role === 'admin' && showHistory && (
                   <div className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl rounded-xl p-6 border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
                     <div className="flex items-center justify-between mb-4">
@@ -1342,21 +2168,78 @@ const firebaseConfig = {
                         <XCircle />
                       </button>
                     </div>
+                    
+                    {/* FILTROS */}
+                    <div className="mb-4 p-4 bg-slate-900/30 rounded-lg border border-slate-700">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Filter className="text-blue-400" />
+                        <h3 className="text-white font-semibold">Filtros</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs text-slate-400 mb-1">Usuario</label>
+                          <input
+                            type="text"
+                            value={historyFilterUser}
+                            onChange={(e) => setHistoryFilterUser(e.target.value)}
+                            placeholder="Nombre o email..."
+                            className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-slate-400 mb-1">Fecha Inicio</label>
+                          <input
+                            type="date"
+                            value={historyFilterStartDate}
+                            onChange={(e) => setHistoryFilterStartDate(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-slate-400 mb-1">Fecha Fin</label>
+                          <input
+                            type="date"
+                            value={historyFilterEndDate}
+                            onChange={(e) => setHistoryFilterEndDate(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+                          />
+                        </div>
+                      </div>
+                      {(historyFilterUser || historyFilterStartDate || historyFilterEndDate) && (
+                        <button
+                          onClick={() => {
+                            setHistoryFilterUser('');
+                            setHistoryFilterStartDate('');
+                            setHistoryFilterEndDate('');
+                          }}
+                          className="mt-3 text-xs text-blue-400 hover:text-blue-300">
+                          Limpiar filtros
+                        </button>
+                      )}
+                    </div>
+                    
                     <div className="max-h-96 overflow-y-auto space-y-2">
-                      {changeHistory.length === 0 ? (
-                        <p className="text-slate-400 text-center py-8">No hay historial disponible</p>
+                      {getFilteredHistory().length === 0 ? (
+                        <p className="text-slate-400 text-center py-8">
+                          {changeHistory.length === 0 ? 'No hay historial disponible' : 'No se encontraron registros con estos filtros'}
+                        </p>
                       ) : (
-                        changeHistory.map(entry => (
-                          <div key={entry.id} className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
-                            <p className="text-white font-semibold">{entry.action}</p>
-                            <p className="text-slate-300 text-sm mt-1">{entry.details}</p>
-                            <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
-                              <span>👤 {entry.user}</span>
-                              <span>📧 {entry.userEmail}</span>
-                              <span>🕐 {entry.timestamp}</span>
-                            </div>
+                        <>
+                          <div className="mb-2 text-sm text-slate-400">
+                            Mostrando {getFilteredHistory().length} de {changeHistory.length} registros
                           </div>
-                        ))
+                          {getFilteredHistory().map(entry => (
+                            <div key={entry.id} className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                              <p className="text-white font-semibold">{entry.action}</p>
+                              <p className="text-slate-300 text-sm mt-1">{entry.details}</p>
+                              <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
+                                <span>👤 {entry.user}</span>
+                                <span>📧 {entry.userEmail}</span>
+                                <span>🕐 {entry.timestamp}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </>
                       )}
                     </div>
                   </div>
