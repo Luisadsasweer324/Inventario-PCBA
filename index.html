@@ -783,7 +783,7 @@
               stockMinimo: 10,
               requestedBy: currentUser.name,
               requestedByEmail: currentUser.email,
-              requestDate: new Date().toLocaleString('es-MX'),
+              const requestDate = new Date().toLocaleString(['es-MX', 'en-US']);
               status: 'pending'
             };
 
