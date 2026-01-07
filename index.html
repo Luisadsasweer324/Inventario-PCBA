@@ -76,7 +76,7 @@
         appId: "1:556200473276:web:b9fd510b9b52cade59d6b9",
         measurementId: "G-FF2332NPFS"
         };
-
+        
         const isFirebaseConfigured = firebaseConfig.apiKey !== "TU_API_KEY";
         let database = null;
         let firebaseInitialized = false;
@@ -462,6 +462,12 @@
           const [selectedWeek, setSelectedWeek] = useState('');
           const [weekCompare1, setWeekCompare1] = useState('');
           const [weekCompare2, setWeekCompare2] = useState('');
+          
+          // Filtros de semanas
+          const [weekFilterModelo, setWeekFilterModelo] = useState('');
+          const [weekFilterUbicacion, setWeekFilterUbicacion] = useState('');
+          const [weekFilterOperacion, setWeekFilterOperacion] = useState('');
+          const [weekFilterEquipo, setWeekFilterEquipo] = useState('');
           
           const [formData, setFormData] = useState({
             modelo: '', equipo: '', cantidad: '', ubicacion: '', 
@@ -1104,7 +1110,10 @@
                       byUser: {},
                       entriesCount: 0,
                       exitsCount: 0,
-                      editsCount: 0
+                      editsCount: 0,
+                      quantitiesAdded: 0,
+                      quantitiesRemoved: 0,
+                      quantitiesEdited: 0
                     }
                   };
                 }
@@ -1112,13 +1121,20 @@
                 weeksMap[key].entries.push(entry);
                 weeksMap[key].stats.total++;
                 
-                // Contar por tipo
-                if (entry.action.includes('agregado') || entry.action.includes('Aprobación') || entry.action.includes('Importación')) {
+                // Extraer cantidad del details
+                const quantityMatch = entry.details.match(/(\d+)\s*unidades?/i);
+                const quantity = quantityMatch ? parseInt(quantityMatch[1]) : 0;
+                
+                // Contar por tipo y acumular cantidades
+                if (entry.action.includes('agregó') || entry.action.includes('Aprobación') || entry.action.includes('Importación')) {
                   weeksMap[key].stats.entriesCount++;
-                } else if (entry.action.includes('eliminado')) {
+                  weeksMap[key].stats.quantitiesAdded += quantity;
+                } else if (entry.action.includes('eliminó')) {
                   weeksMap[key].stats.exitsCount++;
-                } else if (entry.action.includes('editado') || entry.action.includes('ajustó')) {
+                  weeksMap[key].stats.quantitiesRemoved += quantity;
+                } else if (entry.action.includes('editó') || entry.action.includes('ajustó')) {
                   weeksMap[key].stats.editsCount++;
+                  weeksMap[key].stats.quantitiesEdited += quantity;
                 }
                 
                 // Contar por usuario
@@ -1135,6 +1151,27 @@
             return Object.values(weeksMap).sort((a, b) => {
               if (a.year !== b.year) return b.year - a.year;
               return b.week - a.week;
+            });
+          };
+
+          // Filtrar entradas de semanas
+          const filterWeekEntries = (entries) => {
+            return entries.filter(entry => {
+              const details = entry.details.toLowerCase();
+              
+              const matchModelo = !weekFilterModelo || 
+                details.includes(weekFilterModelo.toLowerCase());
+              
+              const matchUbicacion = !weekFilterUbicacion || 
+                details.includes(weekFilterUbicacion.toLowerCase());
+              
+              const matchOperacion = !weekFilterOperacion || 
+                details.includes(weekFilterOperacion.toLowerCase());
+              
+              const matchEquipo = !weekFilterEquipo || 
+                details.includes(weekFilterEquipo.toLowerCase());
+              
+              return matchModelo && matchUbicacion && matchOperacion && matchEquipo;
             });
           };
 
@@ -1940,6 +1977,56 @@
                       </button>
                     </div>
 
+                    {/* FILTROS */}
+                    <div className="mb-6 p-4 bg-slate-900/30 rounded-lg border border-slate-700">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Filter className="text-blue-400" />
+                        <h3 className="text-white font-semibold">Filtros</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <input
+                          type="text"
+                          value={weekFilterModelo}
+                          onChange={(e) => setWeekFilterModelo(e.target.value)}
+                          placeholder="Modelo..."
+                          className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+                        />
+                        <input
+                          type="text"
+                          value={weekFilterUbicacion}
+                          onChange={(e) => setWeekFilterUbicacion(e.target.value)}
+                          placeholder="Ubicación..."
+                          className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+                        />
+                        <input
+                          type="text"
+                          value={weekFilterOperacion}
+                          onChange={(e) => setWeekFilterOperacion(e.target.value)}
+                          placeholder="Operación..."
+                          className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+                        />
+                        <input
+                          type="text"
+                          value={weekFilterEquipo}
+                          onChange={(e) => setWeekFilterEquipo(e.target.value)}
+                          placeholder="Equipo..."
+                          className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+                        />
+                      </div>
+                      {(weekFilterModelo || weekFilterUbicacion || weekFilterOperacion || weekFilterEquipo) && (
+                        <button
+                          onClick={() => {
+                            setWeekFilterModelo('');
+                            setWeekFilterUbicacion('');
+                            setWeekFilterOperacion('');
+                            setWeekFilterEquipo('');
+                          }}
+                          className="mt-3 text-xs text-blue-400 hover:text-blue-300">
+                          Limpiar filtros
+                        </button>
+                      )}
+                    </div>
+
                     {/* SEMANA ACTUAL */}
                     <div className="mb-8 p-6 bg-gradient-to-r from-blue-600/20 to-purple-600/20 border-2 border-blue-500 rounded-xl">
                       <div className="flex items-center justify-between mb-4">
@@ -1950,10 +2037,11 @@
                         <div className="text-right">
                           {(() => {
                             const currentWeekData = getAllWeeks()[0];
-                            return currentWeekData ? (
+                            const filtered = currentWeekData ? filterWeekEntries(currentWeekData.entries) : [];
+                            return filtered.length > 0 ? (
                               <>
-                                <p className="text-4xl font-bold text-white">{currentWeekData.stats.total}</p>
-                                <p className="text-blue-300 text-sm">Operaciones totales</p>
+                                <p className="text-4xl font-bold text-white">{filtered.length}</p>
+                                <p className="text-blue-300 text-sm">Operaciones{(weekFilterModelo || weekFilterUbicacion || weekFilterOperacion || weekFilterEquipo) ? ' (filtradas)' : ''}</p>
                               </>
                             ) : (
                               <p className="text-slate-400">Sin datos</p>
@@ -1969,14 +2057,17 @@
                             <div className="bg-green-600/20 border border-green-500 rounded-lg p-4 text-center">
                               <p className="text-3xl font-bold text-green-400">{currentWeekData.stats.entriesCount}</p>
                               <p className="text-green-300 text-sm">Entradas</p>
+                              <p className="text-green-200 text-xs mt-1">{currentWeekData.stats.quantitiesAdded} unidades</p>
                             </div>
                             <div className="bg-red-600/20 border border-red-500 rounded-lg p-4 text-center">
                               <p className="text-3xl font-bold text-red-400">{currentWeekData.stats.exitsCount}</p>
                               <p className="text-red-300 text-sm">Salidas</p>
+                              <p className="text-red-200 text-xs mt-1">{currentWeekData.stats.quantitiesRemoved} unidades</p>
                             </div>
                             <div className="bg-blue-600/20 border border-blue-500 rounded-lg p-4 text-center">
                               <p className="text-3xl font-bold text-blue-400">{currentWeekData.stats.editsCount}</p>
                               <p className="text-blue-300 text-sm">Ediciones</p>
+                              <p className="text-blue-200 text-xs mt-1">{currentWeekData.stats.quantitiesEdited} unidades</p>
                             </div>
                           </div>
                         ) : null;
@@ -2077,15 +2168,24 @@
                             <div className="space-y-2">
                               <div className="flex items-center justify-between text-sm">
                                 <span className="text-green-400">✅ Entradas:</span>
-                                <span className="font-bold text-green-400">{week.stats.entriesCount}</span>
+                                <div className="text-right">
+                                  <span className="font-bold text-green-400">{week.stats.entriesCount}</span>
+                                  <span className="text-green-300 text-xs ml-1">({week.stats.quantitiesAdded}u)</span>
+                                </div>
                               </div>
                               <div className="flex items-center justify-between text-sm">
                                 <span className="text-red-400">❌ Salidas:</span>
-                                <span className="font-bold text-red-400">{week.stats.exitsCount}</span>
+                                <div className="text-right">
+                                  <span className="font-bold text-red-400">{week.stats.exitsCount}</span>
+                                  <span className="text-red-300 text-xs ml-1">({week.stats.quantitiesRemoved}u)</span>
+                                </div>
                               </div>
                               <div className="flex items-center justify-between text-sm">
                                 <span className="text-blue-400">✏️ Ediciones:</span>
-                                <span className="font-bold text-blue-400">{week.stats.editsCount}</span>
+                                <div className="text-right">
+                                  <span className="font-bold text-blue-400">{week.stats.editsCount}</span>
+                                  <span className="text-blue-300 text-xs ml-1">({week.stats.quantitiesEdited}u)</span>
+                                </div>
                               </div>
                             </div>
                             
