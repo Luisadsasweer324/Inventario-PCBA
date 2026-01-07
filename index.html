@@ -585,6 +585,18 @@
           };
 
           const addToHistory = (action, details, user) => {
+            // Solo registrar movimientos de inventario
+            const inventoryActions = [
+              'agregó', 'eliminó', 'editó', 'ajustó', 
+              'Importación', 'Aprobación de material'
+            ];
+            
+            const shouldRecord = inventoryActions.some(keyword => 
+              action.toLowerCase().includes(keyword.toLowerCase())
+            );
+            
+            if (!shouldRecord) return; // No guardar otras acciones
+            
             const historyEntry = {
               id: Date.now(),
               action,
@@ -700,6 +712,12 @@
           };
 
           const toggleUserRole = async (userId) => {
+            // Solo el admin principal puede cambiar roles
+            if (currentUser.email !== 'admin@empresa.com') {
+              alert('⛔ Solo el administrador principal puede cambiar roles');
+              return;
+            }
+            
             const updatedUsers = users.map(user => {
               if (user.id === userId && user.email !== 'admin@empresa.com') {
                 const newRole = user.role === 'admin' ? 'user' : 'admin';
@@ -724,6 +742,12 @@
           };
 
           const deleteUser = async (userId) => {
+            // Solo el admin principal puede eliminar usuarios
+            if (currentUser.email !== 'admin@empresa.com') {
+              alert('⛔ Solo el administrador principal puede eliminar usuarios');
+              return;
+            }
+            
             const userToDelete = users.find(u => u.id === userId);
             if (userToDelete && userToDelete.email === 'admin@empresa.com') {
               alert('⛔ No puedes eliminar al administrador principal');
@@ -1401,16 +1425,16 @@
 
           // ==================== DASHBOARD ====================
           return (
-            <div className={`min-h-screen ${darkMode ? 'bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900' : 'bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900'}`}>
-              <header className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl border-b ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+            <div className={`min-h-screen ${darkMode ? 'bg-slate-950' : 'bg-gradient-to-br from-blue-50 via-slate-50 to-gray-100'}`}>
+              <header className={`${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-200'} backdrop-blur-xl border-b shadow-lg`}>
                 <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between flex-wrap gap-4">
                   <div className="flex items-center gap-3">
                     <div className="bg-blue-600 p-2 rounded-lg">
                       <Package className="w-6 h-6" />
                     </div>
                     <div>
-                      <h1 className="text-xl font-bold text-white">Sistema de Inventario</h1>
-                      <p className="text-sm text-slate-400">
+                      <h1 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Sistema de Inventario</h1>
+                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-gray-600'}`}>
                         {currentUser?.name} 
                         {currentUser?.role === 'admin' && <span className="ml-2 text-yellow-400">👑 Admin</span>}
                         <span className="ml-2 text-blue-400">📅 {getCurrentWeek().display}</span>
@@ -1507,7 +1531,7 @@
                               )}
                             </div>
                             <div className="flex gap-2 flex-wrap">
-                              {user.email !== 'admin@empresa.com' && (
+                              {user.email !== 'admin@empresa.com' && currentUser.email === 'admin@empresa.com' && (
                                 <>
                                   <button 
                                     onClick={() => toggleUserRole(user.id)}
@@ -1522,8 +1546,11 @@
                                   </button>
                                 </>
                               )}
+                              {user.email !== 'admin@empresa.com' && currentUser.email !== 'admin@empresa.com' && (
+                                <span className="text-slate-500 text-xs italic">Solo admin principal puede editar</span>
+                              )}
                               {user.email === 'admin@empresa.com' && (
-                                <span className="text-slate-500 text-xs italic">Admin Principal</span>
+                                <span className="text-yellow-500 text-xs italic font-semibold">👑 Admin Principal</span>
                               )}
                             </div>
                           </div>
