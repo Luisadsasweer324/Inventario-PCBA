@@ -1523,46 +1523,57 @@
             
             return flow;
           };
-
-          // Material con más tiempo detenido
-          const getStagnantMaterials = () => {
-            // Fecha actual solo con día (sin horas)
-            const now = new Date();
-            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             
-            const materialsWithActivity = inventory.map(item => {
-              // Buscar última actividad de este item en el historial
-              const lastActivity = changeHistory
-                .filter(entry => 
-                  entry.details.toLowerCase().includes(item.modelo.toLowerCase()) &&
-                  (entry.details.toLowerCase().includes(item.ubicacion.toLowerCase()) ||
-                   entry.action.includes('ajustó') || 
-                   entry.action.includes('editado') ||
-                   entry.action.includes('agregó'))
-                )
-                .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
-              
-              // Determinar fecha de última actividad
-              let lastActivityDate;
-              
-              if (lastActivity && lastActivity.date) {
-                // Usar fecha del historial
-                const actDate = new Date(lastActivity.date);
-                lastActivityDate = new Date(actDate.getFullYear(), actDate.getMonth(), actDate.getDate());
-              } else if (item.fechaRegistro) {
-                // Usar fecha de registro del item
-                const regDate = new Date(item.fechaRegistro);
-                lastActivityDate = new Date(regDate.getFullYear(), regDate.getMonth(), regDate.getDate());
-              } else {
-                // Si no hay fecha, usar hoy (material sin fecha)
-                lastActivityDate = today;
-              }
-              
-              // Calcular días transcurridos (nunca negativo)
-              const millisDiff = today.getTime() - lastActivityDate.getTime();
-              const daysSinceActivity = Math.max(0, Math.floor(millisDiff / (1000 * 60 * 60 * 24)));
-              
-              return {
+ // Material con más tiempo detenido
+const getStagnantMaterials = () => {
+  // Fecha actual solo con día (sin horas) - normalizada a medianoche UTC
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  today.setHours(0, 0, 0, 0);
+  
+  const materialsWithActivity = inventory.map(item => {
+    // Buscar última actividad de este item en el historial
+    const lastActivity = changeHistory
+      .filter(entry => 
+        entry.details.toLowerCase().includes(item.modelo.toLowerCase()) &&
+        (entry.details.toLowerCase().includes(item.ubicacion.toLowerCase()) ||
+         entry.action.includes('ajustó') || 
+         entry.action.includes('editado') ||
+         entry.action.includes('agregó'))
+      )
+      .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+    
+    // Determinar fecha de última actividad
+    let lastActivityDate;
+    
+    if (lastActivity && lastActivity.date) {
+      // Usar fecha del historial - normalizar a medianoche
+      const actDate = new Date(lastActivity.date);
+      lastActivityDate = new Date(actDate.getFullYear(), actDate.getMonth(), actDate.getDate());
+      lastActivityDate.setHours(0, 0, 0, 0);
+    } else if (item.fechaRegistro) {
+      // Usar fecha de registro del item - normalizar a medianoche
+      const regDate = new Date(item.fechaRegistro);
+      lastActivityDate = new Date(regDate.getFullYear(), regDate.getMonth(), regDate.getDate());
+      lastActivityDate.setHours(0, 0, 0, 0);
+    } else {
+      // Si no hay fecha, usar hoy
+      lastActivityDate = new Date(today);
+    }
+    
+    // Calcular días transcurridos (nunca negativo)
+    const millisDiff = today.getTime() - lastActivityDate.getTime();
+    const daysSinceActivity = Math.max(0, Math.floor(millisDiff / (1000 * 60 * 60 * 24)));
+
+    return {
+      ...item,
+      daysSinceActivity,
+      lastActivityDate
+    };
+  });
+  
+  return materialsWithActivity;
+};             return {
                 ...item,
                 lastActivity: lastActivityDate,
                 daysSinceActivity,
