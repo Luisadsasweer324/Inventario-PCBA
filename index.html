@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inventario -PCBA</title>
+    <title>Sistema de Inventario</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -683,6 +683,24 @@
             setView('login');
           };
 
+          const cleanProcessedMaterials = () => {
+            // Eliminar solicitudes procesadas (aprobadas o rechazadas) de más de 24 horas
+            const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            const cleaned = pendingMaterials.filter(m => {
+              if (m.status === 'pending') return true; // Mantener pendientes
+              if (!m.processedDate) return false; // Eliminar sin fecha
+              return new Date(m.processedDate) > oneDayAgo; // Mantener recientes
+            });
+            
+            if (cleaned.length !== pendingMaterials.length) {
+              setPendingMaterials(cleaned);
+              saveToStorage('pending-materials', cleaned);
+              alert(`🧹 Se limpiaron ${pendingMaterials.length - cleaned.length} solicitudes procesadas antiguas`);
+            } else {
+              alert('✨ No hay solicitudes antiguas para limpiar');
+            }
+          };
+
           const approveUser = async (userId) => {
             const userToApprove = pendingUsers.find(u => u.id === userId);
             if (userToApprove) {
@@ -781,6 +799,40 @@
               return;
             }
 
+            // Si es admin principal, agregar directo sin aprobación
+            if (currentUser.email === 'admin@empresa.com') {
+              const newItem = {
+                id: Date.now(),
+                modelo: formData.modelo,
+                equipo: formData.equipo,
+                cantidad: parseInt(formData.cantidad),
+                ubicacion: formData.ubicacion,
+                operacionActual: formData.operacionActual,
+                proximaOperacion: formData.proximaOperacion,
+                comentario: formData.comentario,
+                stockMinimo: 10,
+                fechaRegistro: new Date().toISOString(),
+                creadoPor: currentUser.name
+              };
+              
+              const updatedInventory = [...inventory, newItem];
+              setInventory(updatedInventory);
+              saveToStorage('inventory-data', updatedInventory);
+              
+              addToHistory('Material agregado', 
+                `${currentUser.name} agregó: ${formData.modelo} (${formData.cantidad} unidades) en ${formData.ubicacion}`, 
+                currentUser);
+              
+              setFormData({
+                modelo: '', equipo: '', cantidad: '', ubicacion: '', 
+                operacionActual: '', proximaOperacion: '', comentario: '', stockMinimo: '10'
+              });
+              
+              alert('✅ Material agregado directamente (Admin Principal)');
+              return;
+            }
+
+            // Para usuarios normales y admins secundarios: crear solicitud
             const materialRequest = {
               id: Date.now(),
               ...formData,
@@ -809,6 +861,12 @@
           const approveMaterial = (materialId) => {
             const material = pendingMaterials.find(m => m.id === materialId);
             if (material) {
+              // Verificar si ya fue procesada
+              if (material.status !== 'pending') {
+                alert('⚠️ Esta solicitud ya fue procesada por otro administrador');
+                return;
+              }
+              
               const existingItem = inventory.find(item => 
                 item.modelo.toLowerCase() === material.modelo.toLowerCase() &&
                 item.ubicacion.toLowerCase() === material.ubicacion.toLowerCase()
@@ -848,7 +906,12 @@
               setInventory(updatedInventory);
               saveToStorage('inventory-data', updatedInventory);
 
-              const updatedPending = pendingMaterials.filter(m => m.id !== materialId);
+              // Marcar como aprobada en lugar de eliminar
+              const updatedPending = pendingMaterials.map(m => 
+                m.id === materialId 
+                  ? { ...m, status: 'approved', processedBy: currentUser.name, processedDate: new Date().toISOString() }
+                  : m
+              );
               setPendingMaterials(updatedPending);
               saveToStorage('pending-materials', updatedPending);
 
@@ -860,7 +923,18 @@
           const rejectMaterial = (materialId) => {
             const material = pendingMaterials.find(m => m.id === materialId);
             if (material) {
-              const updatedPending = pendingMaterials.filter(m => m.id !== materialId);
+              // Verificar si ya fue procesada
+              if (material.status !== 'pending') {
+                alert('⚠️ Esta solicitud ya fue procesada por otro administrador');
+                return;
+              }
+              
+              // Marcar como rechazada en lugar de eliminar
+              const updatedPending = pendingMaterials.map(m => 
+                m.id === materialId 
+                  ? { ...m, status: 'rejected', processedBy: currentUser.name, processedDate: new Date().toISOString() }
+                  : m
+              );
               setPendingMaterials(updatedPending);
               saveToStorage('pending-materials', updatedPending);
 
@@ -2548,11 +2622,11 @@
                 )}
 
                 {/* SOLICITUDES DE MATERIAL */}
-                {currentUser?.role === 'admin' && pendingMaterials.length > 0 && (
+                {currentUser?.role === 'admin' && pendingMaterials.filter(m => m.status === 'pending').length > 0 && (
                   <div className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl rounded-xl p-6 border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
-                    <h2 className="text-xl font-bold text-white mb-4">📄 Solicitudes de Material ({pendingMaterials.length})</h2>
+                    <h2 className="text-xl font-bold text-white mb-4">📄 Solicitudes de Material ({pendingMaterials.filter(m => m.status === 'pending').length})</h2>
                     <div className="space-y-3">
-                      {pendingMaterials.map(material => (
+                      {pendingMaterials.filter(m => m.status === 'pending').map(material => (
                         <div key={material.id} className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
                           <div className="flex items-start justify-between gap-4 flex-wrap">
                             <div className="flex-1">
