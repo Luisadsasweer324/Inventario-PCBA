@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inventario</title>
+    <title>Sistema de Inventario -PCBA</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -836,7 +836,7 @@
                   proximaOperacion: material.proximaOperacion,
                   comentario: material.comentario,
                   stockMinimo: 10,
-                  fechaRegistro: new Date().toLocaleDateString(),
+                  fechaRegistro: new Date().toISOString(),
                   creadoPor: material.requestedBy
                 };
                 updatedInventory = [...inventory, newItem];
@@ -1011,7 +1011,7 @@
                       operacionActual: row['Op. Actual'] || '',
                       proximaOperacion: row['Próxima Op.'] || '',
                       comentario: row.Comentario || '',
-                      fechaRegistro: new Date().toLocaleDateString(),
+                      fechaRegistro: new Date().toISOString(),
                       creadoPor: currentUser.name
                     };
                   } catch (err) {
@@ -1452,41 +1452,47 @@
 
           // Material con más tiempo detenido
           const getStagnantMaterials = () => {
-            // Fecha actual solo con día (sin horas/timezone)
+            // Fecha actual solo con día (sin horas)
             const now = new Date();
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             
             const materialsWithActivity = inventory.map(item => {
-              // Buscar última actividad de este item
+              // Buscar última actividad de este item en el historial
               const lastActivity = changeHistory
                 .filter(entry => 
                   entry.details.toLowerCase().includes(item.modelo.toLowerCase()) &&
                   (entry.details.toLowerCase().includes(item.ubicacion.toLowerCase()) ||
                    entry.action.includes('ajustó') || 
-                   entry.action.includes('editado'))
+                   entry.action.includes('editado') ||
+                   entry.action.includes('agregó'))
                 )
                 .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
               
-              // Usar fecha sin timezone
+              // Determinar fecha de última actividad
               let lastActivityDate;
-              if (lastActivity) {
+              
+              if (lastActivity && lastActivity.date) {
+                // Usar fecha del historial
                 const actDate = new Date(lastActivity.date);
                 lastActivityDate = new Date(actDate.getFullYear(), actDate.getMonth(), actDate.getDate());
               } else if (item.fechaRegistro) {
+                // Usar fecha de registro del item
                 const regDate = new Date(item.fechaRegistro);
                 lastActivityDate = new Date(regDate.getFullYear(), regDate.getMonth(), regDate.getDate());
               } else {
+                // Si no hay fecha, usar hoy (material sin fecha)
                 lastActivityDate = today;
               }
               
-              // Calcular días (evita negativos)
-              const daysSinceActivity = Math.max(0, Math.floor((today - lastActivityDate) / (1000 * 60 * 60 * 24)));
+              // Calcular días transcurridos (nunca negativo)
+              const millisDiff = today.getTime() - lastActivityDate.getTime();
+              const daysSinceActivity = Math.max(0, Math.floor(millisDiff / (1000 * 60 * 60 * 24)));
               
               return {
                 ...item,
                 lastActivity: lastActivityDate,
                 daysSinceActivity,
-                lastAction: lastActivity?.action || 'Sin actividad'
+                lastAction: lastActivity?.action || 'Recién agregado'
               };
             });
             
