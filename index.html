@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inventario - Versión Corregida</title>
+    <title>Sistema de Inventario</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -76,7 +76,7 @@
         appId: "1:556200473276:web:b9fd510b9b52cade59d6b9",
         measurementId: "G-FF2332NPFS"
         };
-
+        
         const isFirebaseConfigured = firebaseConfig.apiKey !== "TU_API_KEY";
         let database = null;
         let firebaseInitialized = false;
@@ -480,12 +480,21 @@
           });
 
           const [users, setUsers] = useState([
-            { id: 1, email: 'admin@empresa.com', password: 'admin123', role: 'admin', status: 'approved', name: 'Administrador' }
+            { id: 1, email: 'admin@empresa.com', password: 'admin123', role: 'admin', status: 'approved', name: 'Administrador', canApprove: true }
           ]);
           const [pendingUsers, setPendingUsers] = useState([]);
           const [pendingMaterials, setPendingMaterials] = useState([]);
           const [changeHistory, setChangeHistory] = useState([]);
           const fileInputRef = useRef(null);
+          
+          // Blocklists configurables
+          const [blocklists, setBlocklists] = useState({
+            ubicaciones: ['Almacén Principal', 'Taller 1', 'Taller 2', 'Bodega A', 'Bodega B'],
+            operaciones: ['Corte', 'Ensamblaje', 'Pulido', 'Inspección', 'Empaque', 'Pintura'],
+            equipos: ['Equipo A', 'Equipo B', 'Equipo C', 'Línea 1', 'Línea 2'],
+            modelos: []
+          });
+          const [showBlocklistConfig, setShowBlocklistConfig] = useState(false);
 
           // Listeners de Firebase en tiempo real
           useEffect(() => {
@@ -554,16 +563,22 @@
                 const usersResult = await window.storage.get('approved-users');
                 if (usersResult) {
                   const loadedUsers = JSON.parse(usersResult.value);
+                  // Migrar usuarios para agregar canApprove
+                  const migratedUsers = loadedUsers.map(u => ({
+                    ...u,
+                    canApprove: u.canApprove !== undefined ? u.canApprove : (u.email === 'admin@empresa.com')
+                  }));
+                  
                   // Asegurar que el admin principal siempre esté
-                  const hasAdmin = loadedUsers.find(u => u.email === 'admin@empresa.com');
+                  const hasAdmin = migratedUsers.find(u => u.email === 'admin@empresa.com');
                   if (!hasAdmin) {
-                    setUsers([...loadedUsers, { id: 1, email: 'admin@empresa.com', password: 'admin123', role: 'admin', status: 'approved', name: 'Administrador' }]);
+                    setUsers([...migratedUsers, { id: 1, email: 'admin@empresa.com', password: 'admin123', role: 'admin', status: 'approved', name: 'Administrador', canApprove: true }]);
                   } else {
-                    setUsers(loadedUsers);
+                    setUsers(migratedUsers);
                   }
                 } else {
                   // Si no hay datos guardados, establecer el admin por defecto
-                  const defaultAdmin = [{ id: 1, email: 'admin@empresa.com', password: 'admin123', role: 'admin', status: 'approved', name: 'Administrador' }];
+                  const defaultAdmin = [{ id: 1, email: 'admin@empresa.com', password: 'admin123', role: 'admin', status: 'approved', name: 'Administrador', canApprove: true }];
                   setUsers(defaultAdmin);
                   await window.storage.set('approved-users', JSON.stringify(defaultAdmin));
                 }
@@ -573,6 +588,11 @@
                 
                 const historyResult = await window.storage.get('change-history');
                 if (historyResult) setChangeHistory(JSON.parse(historyResult.value));
+                
+                const blocklistsResult = await window.storage.get('blocklists');
+                if (blocklistsResult) {
+                  setBlocklists(JSON.parse(blocklistsResult.value));
+                }
 
                 // Modo oscuro (localStorage - privado por dispositivo)
                 const darkModeResult = localStorage.getItem('dark-mode');
@@ -807,6 +827,47 @@
             }
           };
 
+          const toggleApprovalPermission = async (userId) => {
+            // Solo el admin principal puede cambiar permisos
+            if (currentUser.email !== 'admin@empresa.com') {
+              alert('⛔ Solo el administrador principal puede cambiar permisos');
+              return;
+            }
+            
+            const updatedUsers = users.map(u => 
+              u.id === userId 
+                ? { ...u, canApprove: !u.canApprove }
+                : u
+            );
+            setUsers(updatedUsers);
+            await saveToStorage('approved-users', updatedUsers);
+            
+            const user = updatedUsers.find(u => u.id === userId);
+            addToHistory('Permisos modificados', 
+              `Admin ${user.canApprove ? 'otorgó' : 'revocó'} permisos de aprobación a ${user.name}`, 
+              currentUser);
+          };
+
+          const addToBlocklist = async (type, value) => {
+            if (!value.trim()) return;
+            
+            const updated = {
+              ...blocklists,
+              [type]: [...blocklists[type], value.trim()]
+            };
+            setBlocklists(updated);
+            await window.storage.set('blocklists', JSON.stringify(updated));
+          };
+
+          const removeFromBlocklist = async (type, index) => {
+            const updated = {
+              ...blocklists,
+              [type]: blocklists[type].filter((_, i) => i !== index)
+            };
+            setBlocklists(updated);
+            await window.storage.set('blocklists', JSON.stringify(updated));
+          };
+
           const handleRequestMaterial = (e) => {
             e.preventDefault();
 
@@ -877,6 +938,12 @@
           };
 
           const approveMaterial = (materialId) => {
+            // Verificar permisos
+            if (!currentUser?.canApprove && currentUser?.email !== 'admin@empresa.com') {
+              alert('❌ No tienes permisos para aprobar solicitudes.\nContacta al administrador principal.');
+              return;
+            }
+            
             const material = pendingMaterials.find(m => m.id === materialId);
             if (material) {
               // Verificar si ya fue procesada
@@ -940,6 +1007,12 @@
           };
 
           const rejectMaterial = (materialId) => {
+            // Verificar permisos
+            if (!currentUser?.canApprove && currentUser?.email !== 'admin@empresa.com') {
+              alert('❌ No tienes permisos para rechazar solicitudes.\nContacta al administrador principal.');
+              return;
+            }
+            
             const material = pendingMaterials.find(m => m.id === materialId);
             if (material) {
               // Verificar si ya fue procesada
@@ -1164,7 +1237,6 @@
             const totalRecords = inventory.length;
             const totalQuantity = inventory.reduce((sum, item) => sum + parseInt(item.cantidad), 0);
             const lowStock = getLowStockItems().length;
-            const highStock = inventory.filter(item => parseInt(item.cantidad) >= (parseInt(item.stockMaximo) || 100)).length;
             const critical = getCriticalStockItems().length;
             const locations = [...new Set(inventory.map(i => i.ubicacion))].length;
             const uniqueModels = [...new Set(inventory.map(i => i.modelo))].length;
@@ -1173,8 +1245,7 @@
               totalRecords,
               totalQuantity,
               uniqueModels,
-              lowStock,
-              highStock,
+              lowStock, 
               critical, 
               locations 
             };
@@ -1927,17 +1998,6 @@
                           <TrendingDown className="w-12 h-12 text-red-400" />
                         </div>
                       </div>
-
-                      <div className="bg-purple-600/20 border border-purple-500 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-purple-300 text-sm">Stock Alto</p>
-                            <p className="text-3xl font-bold text-white">{stats.highStock}</p>
-                            <p className="text-purple-200 text-xs mt-1">Excede máximo</p>
-                          </div>
-                          <Package className="w-12 h-12 text-purple-400" />
-                        </div>
-                      </div>
                     </div>
 
                     {lowStockItems.length > 0 && (
@@ -1970,37 +2030,6 @@
                         </div>
                       </div>
                     )}
-
-                    {(() => {
-                      const highStockItems = inventory.filter(item => parseInt(item.cantidad) >= (parseInt(item.stockMaximo) || 100));
-                      return highStockItems.length > 0 && (
-                        <div className="bg-purple-900/30 border-2 border-purple-500 rounded-lg p-6 mb-6">
-                          <h3 className="text-xl font-bold text-purple-300 mb-4 flex items-center gap-2">
-                            <Package /> 📦 Productos con Stock Alto
-                          </h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {highStockItems.map(item => (
-                              <div key={item.id} className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border border-purple-500`}>
-                                <div className="flex items-start justify-between">
-                                  <div className="flex-1">
-                                    <p className="text-white font-bold text-lg">{item.modelo}</p>
-                                    <div className="flex items-center gap-2 mt-1 text-sm">
-                                      <MapPin className="w-4 h-4 text-purple-400" />
-                                      <span className="text-purple-300">{item.ubicacion}</span>
-                                    </div>
-                                    <p className="text-slate-300 text-sm mt-1">📦 {item.equipo || 'Sin equipo'}</p>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="text-2xl font-bold text-purple-400">{item.cantidad}</p>
-                                    <p className="text-slate-400 text-xs">Max: {item.stockMaximo || 100}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <div className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-6 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
@@ -2772,8 +2801,14 @@
                       <label className="block text-sm font-medium text-slate-300 mb-2">Equipo</label>
                       <input type="text" value={formData.equipo}
                         onChange={(e) => setFormData({ ...formData, equipo: e.target.value })}
+                        list="equipos-list"
                         className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
-                        placeholder="Nombre" />
+                        placeholder="Selecciona o escribe..." />
+                      <datalist id="equipos-list">
+                        {blocklists.equipos.map((eq, i) => (
+                          <option key={i} value={eq} />
+                        ))}
+                      </datalist>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-2">Cantidad *</label>
@@ -2786,10 +2821,16 @@
                       <label className="block text-sm font-medium text-slate-300 mb-2">Ubicación *</label>
                       <input type="text" value={formData.ubicacion}
                         onChange={(e) => setFormData({ ...formData, ubicacion: e.target.value })}
+                        list="ubicaciones-list"
                         className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
-                        placeholder="Rack A-5" required />
+                        placeholder="Selecciona o escribe..." required />
+                      <datalist id="ubicaciones-list">
+                        {blocklists.ubicaciones.map((ub, i) => (
+                          <option key={i} value={ub} />
+                        ))}
+                      </datalist>
                     </div>
-                    {currentUser?.role === 'admin' && (
+                   {currentUser?.role === 'admin' && (
                       <>
                         <div>
                           <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -2815,15 +2856,22 @@
                       <label className="block text-sm font-medium text-slate-300 mb-2">Op. Actual</label>
                       <input type="text" value={formData.operacionActual}
                         onChange={(e) => setFormData({ ...formData, operacionActual: e.target.value })}
+                        list="operaciones-list"
                         className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
-                        placeholder="Ensamblaje" />
+                        placeholder="Selecciona o escribe..." />
+                      <datalist id="operaciones-list">
+                        {blocklists.operaciones.map((op, i) => (
+                          <option key={i} value={op} />
+                        ))}
+                      </datalist>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-2">Próxima Op.</label>
                       <input type="text" value={formData.proximaOperacion}
                         onChange={(e) => setFormData({ ...formData, proximaOperacion: e.target.value })}
+                        list="operaciones-list"
                         className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
-                        placeholder="Inspección" />
+                        placeholder="Selecciona o escribe..." />
                     </div>
                     <div className="md:col-span-2 lg:col-span-3">
                       <label className="block text-sm font-medium text-slate-300 mb-2">Comentario</label>
