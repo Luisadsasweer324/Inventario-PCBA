@@ -488,16 +488,12 @@
           const fileInputRef = useRef(null);
           
           // Blocklists configurables
-    const BLOCKLISTS = Object.freeze({
-      ubicaciones: Object.freeze([
-        'Fila 1', 'Fila 2', 'Fila 3', 'Fila 4', 'Fila 5',
-        'Fila 6', 'Fila 7', 'Fila 8', 'Fila 9',
-        'Fila 10', 'Fila 11', 'Fila 12', 'Fila 13'
-      ]),
-      operaciones: Object.freeze(['75', '200', 'Escaner', 'Conformal', '800', '805', '900']),
-      equipos: Object.freeze(['ICT', 'ROUTER', 'WAVE SOLDER', 'STITCH PIN']),
-      modelos: Object.freeze([])
-    })    
+          const [blocklists, setBlocklists] = useState({
+            ubicaciones: ['Fila 1', 'Fila 2', 'Fila 3', 'Fila 4', 'Fila 5', 'Fila 6', 'Fila 7', 'Fila 8', 'Fila 9', 'Fila 10', 'Fila 11', 'Fila 12', 'Fila 13'],
+            operaciones: ['75', '200', 'Escaner', 'Conformal', '800', '805', '900'],
+            equipos: ['ICT', 'ROUTER', 'WAVE SOLDER', 'STITCH PIN'],
+            modelos: []
+          }); 
           const [showBlocklistConfig, setShowBlocklistConfig] = useState(false);
 
           // Listeners de Firebase en tiempo real
