@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inventario - Versión Corregida</title>
+    <title>Sistema de Inventario</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -826,8 +826,12 @@
                 operacionActual: formData.operacionActual,
                 proximaOperacion: formData.proximaOperacion,
                 comentario: formData.comentario,
+<<<<<<< HEAD
                 stockMinimo: parseInt(formData.stockMinimo) || 10,
                 stockMaximo: parseInt(formData.stockMaximo) || 100,
+=======
+                stockMinimo: 10,
+>>>>>>> 7d43767872eeff2b2fc9a29fd1dee95aa71b3396
                 fechaRegistro: new Date().toISOString(),
                 creadoPor: currentUser.name
               };
@@ -842,7 +846,11 @@
               
               setFormData({
                 modelo: '', equipo: '', cantidad: '', ubicacion: '', 
+<<<<<<< HEAD
                 operacionActual: '', proximaOperacion: '', comentario: '', stockMinimo: '10', stockMaximo: '100'
+=======
+                operacionActual: '', proximaOperacion: '', comentario: '', stockMinimo: '10'
+>>>>>>> 7d43767872eeff2b2fc9a29fd1dee95aa71b3396
               });
               
               alert('✅ Material agregado directamente (Admin Principal)');
@@ -911,8 +919,12 @@
                   operacionActual: material.operacionActual,
                   proximaOperacion: material.proximaOperacion,
                   comentario: material.comentario,
+<<<<<<< HEAD
                   stockMinimo: material.stockMinimo || 10,
                   stockMaximo: material.stockMaximo || 100,
+=======
+                  stockMinimo: 10,
+>>>>>>> 7d43767872eeff2b2fc9a29fd1dee95aa71b3396
                   fechaRegistro: new Date().toISOString(),
                   creadoPor: material.requestedBy
                 };
@@ -1557,6 +1569,7 @@
             
             return flow;
           };
+<<<<<<< HEAD
 
           // Material con más tiempo detenido
           const getStagnantMaterials = () => {
@@ -1597,6 +1610,61 @@
               const daysSinceActivity = Math.max(0, Math.floor(millisDiff / (1000 * 60 * 60 * 24)));
               
               return {
+=======
+            
+// Material con más tiempo detenido
+const getStagnantMaterials = () => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  today.setHours(0, 0, 0, 0);
+  
+  const materialsWithActivity = inventory.map(item => {
+    // Buscar última actividad de este item en el historial
+    const lastActivity = changeHistory
+      .filter(entry => 
+        entry.details.toLowerCase().includes(item.modelo.toLowerCase()) &&
+        (entry.details.toLowerCase().includes(item.ubicacion.toLowerCase()) ||
+         entry.action.includes('ajustó') || 
+         entry.action.includes('editado') ||
+         entry.action.includes('agregó'))
+      )
+      .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+    
+    // Determinar fecha de última actividad
+    let lastActivityDate;
+    
+    if (lastActivity && lastActivity.date) {
+      const actDate = new Date(lastActivity.date);
+      lastActivityDate = new Date(actDate.getFullYear(), actDate.getMonth(), actDate.getDate());
+      lastActivityDate.setHours(0, 0, 0, 0);
+    } else if (item.fechaRegistro) {
+      const regDate = new Date(item.fechaRegistro);
+      lastActivityDate = new Date(regDate.getFullYear(), regDate.getMonth(), regDate.getDate());
+      lastActivityDate.setHours(0, 0, 0, 0);
+    } else {
+      lastActivityDate = new Date(today);
+    }
+    
+    // Calcular días transcurridos (nunca negativo)
+    const millisDiff = today.getTime() - lastActivityDate.getTime();
+    const daysSinceActivity = Math.max(0, Math.floor(millisDiff / (1000 * 60 * 60 * 24)));
+
+    return {
+      ...item,
+      lastActivity: lastActivityDate,
+      daysSinceActivity,
+      lastAction: lastActivity?.action || 'Recién agregado'
+    };
+  });
+  
+  // Ordenar por días descendente y tomar top 10
+  return materialsWithActivity
+    .sort((a, b) => b.daysSinceActivity - a.daysSinceActivity)
+    .slice(0, 10);
+};            
+  return materialsWithActivity;
+};             return {
+>>>>>>> 7d43767872eeff2b2fc9a29fd1dee95aa71b3396
                 ...item,
                 lastActivity: lastActivityDate,
                 daysSinceActivity,
@@ -2461,10 +2529,17 @@
                       </div>
                     </div>
 
+<<<<<<< HEAD
                     {/* DISTRIBUCIÓN POR MODELOS */}
                     <div className="mb-8">
                       <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                         <BarChart2 /> Cantidades por Modelo
+=======
+                    {/* DISTRIBUCIÓN POR OPERACIONES */}
+                    <div className="mb-8">
+                      <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        <BarChart2 /> Distribución por Operación
+>>>>>>> 7d43767872eeff2b2fc9a29fd1dee95aa71b3396
                       </h3>
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         {(() => {
@@ -2482,6 +2557,7 @@
                                 </div>
                                 <div className="text-right">
                                   <p className="text-2xl font-bold text-white">{week.totalQuantity}</p>
+<<<<<<< HEAD
                                   <p className="text-slate-400 text-xs">unidades totales</p>
                                 </div>
                               </div>
@@ -2508,11 +2584,32 @@
                                       </div>
                                     ))}
                                   {Object.keys(week.models).length === 0 && (
+=======
+                                  <p className="text-slate-400 text-xs">unidades</p>
+                                </div>
+                              </div>
+                              
+                              {/* Operaciones Actuales */}
+                              <div className="mb-3">
+                                <p className="text-xs text-blue-400 font-semibold mb-2">Operaciones Actuales:</p>
+                                <div className="space-y-1">
+                                  {Object.entries(week.byOperation)
+                                    .sort((a, b) => b[1] - a[1])
+                                    .slice(0, 5)
+                                    .map(([op, qty], i) => (
+                                      <div key={i} className="flex items-center justify-between text-xs">
+                                        <span className="text-slate-300 truncate">{op}</span>
+                                        <span className="text-blue-400 font-bold ml-2">{qty}u</span>
+                                      </div>
+                                    ))}
+                                  {Object.keys(week.byOperation).length === 0 && (
+>>>>>>> 7d43767872eeff2b2fc9a29fd1dee95aa71b3396
                                     <p className="text-xs text-slate-500">Sin datos</p>
                                   )}
                                 </div>
                               </div>
                               
+<<<<<<< HEAD
                               {/* Estadísticas */}
                               <div className="pt-3 border-t border-slate-700 grid grid-cols-2 gap-2 text-xs">
                                 <div className="text-center bg-slate-800/50 rounded p-2">
@@ -2526,6 +2623,24 @@
                                       ? Math.round(week.totalQuantity / Object.keys(week.models).length)
                                       : 0}
                                   </p>
+=======
+                              {/* Próximas Operaciones */}
+                              <div className="pt-3 border-t border-slate-700">
+                                <p className="text-xs text-green-400 font-semibold mb-2">Próximas Operaciones:</p>
+                                <div className="space-y-1">
+                                  {Object.entries(week.byNextOperation)
+                                    .sort((a, b) => b[1] - a[1])
+                                    .slice(0, 5)
+                                    .map(([op, qty], i) => (
+                                      <div key={i} className="flex items-center justify-between text-xs">
+                                        <span className="text-slate-300 truncate">{op}</span>
+                                        <span className="text-green-400 font-bold ml-2">{qty}u</span>
+                                      </div>
+                                    ))}
+                                  {Object.keys(week.byNextOperation).length === 0 && (
+                                    <p className="text-xs text-slate-500">Sin datos</p>
+                                  )}
+>>>>>>> 7d43767872eeff2b2fc9a29fd1dee95aa71b3396
                                 </div>
                               </div>
                             </div>
