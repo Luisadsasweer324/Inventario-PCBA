@@ -76,7 +76,7 @@
         appId: "1:556200473276:web:b9fd510b9b52cade59d6b9",
         measurementId: "G-FF2332NPFS"
         };
-        
+
         const isFirebaseConfigured = firebaseConfig.apiKey !== "TU_API_KEY";
         let database = null;
         let firebaseInitialized = false;
@@ -469,9 +469,14 @@
           const [weekFilterOperacion, setWeekFilterOperacion] = useState('');
           const [weekFilterEquipo, setWeekFilterEquipo] = useState('');
           
+          // Filtros de gráfica de cantidades
+          const [chartFilterModelo, setChartFilterModelo] = useState('');
+          const [chartFilterOperacion, setChartFilterOperacion] = useState('');
+          const [chartFilterUbicacion, setChartFilterUbicacion] = useState('');
+          
           const [formData, setFormData] = useState({
             modelo: '', equipo: '', cantidad: '', ubicacion: '', 
-            operacionActual: '', proximaOperacion: '', comentario: '', stockMinimo: '10'
+            operacionActual: '', proximaOperacion: '', comentario: '', stockMinimo: '10', stockMaximo: '100'
           });
 
           const [users, setUsers] = useState([
@@ -533,7 +538,15 @@
                 }
                 
                 const invResult = await window.storage.get('inventory-data');
-                if (invResult) setInventory(JSON.parse(invResult.value));
+                if (invResult) {
+                  const loadedInventory = JSON.parse(invResult.value);
+                  // Migrar items sin stockMaximo
+                  const migratedInventory = loadedInventory.map(item => ({
+                    ...item,
+                    stockMaximo: item.stockMaximo || 100
+                  }));
+                  setInventory(migratedInventory);
+                }
                 
                 const pendingResult = await window.storage.get('pending-users');
                 if (pendingResult) setPendingUsers(JSON.parse(pendingResult.value));
@@ -617,6 +630,14 @@
             saveToStorage('change-history', updatedHistory);
           };
 
+          const deleteHistoryEntry = (entryId) => {
+            if (!confirm('¿Eliminar esta entrada del historial?')) return;
+            
+            const updatedHistory = changeHistory.filter(entry => entry.id !== entryId);
+            setChangeHistory(updatedHistory);
+            saveToStorage('change-history', updatedHistory);
+          };
+
           const handleLogin = (e) => {
             e.preventDefault();
             const email = e.target.email.value;
@@ -676,6 +697,24 @@
             setCurrentUser(null);
             localStorage.removeItem('current-user-session');
             setView('login');
+          };
+
+          const cleanProcessedMaterials = () => {
+            // Eliminar solicitudes procesadas (aprobadas o rechazadas) de más de 24 horas
+            const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            const cleaned = pendingMaterials.filter(m => {
+              if (m.status === 'pending') return true; // Mantener pendientes
+              if (!m.processedDate) return false; // Eliminar sin fecha
+              return new Date(m.processedDate) > oneDayAgo; // Mantener recientes
+            });
+            
+            if (cleaned.length !== pendingMaterials.length) {
+              setPendingMaterials(cleaned);
+              saveToStorage('pending-materials', cleaned);
+              alert(`🧹 Se limpiaron ${pendingMaterials.length - cleaned.length} solicitudes procesadas antiguas`);
+            } else {
+              alert('✨ No hay solicitudes antiguas para limpiar');
+            }
           };
 
           const approveUser = async (userId) => {
@@ -776,11 +815,47 @@
               return;
             }
 
+            // Si es admin principal, agregar directo sin aprobación
+            if (currentUser.email === 'admin@empresa.com') {
+              const newItem = {
+                id: Date.now(),
+                modelo: formData.modelo,
+                equipo: formData.equipo,
+                cantidad: parseInt(formData.cantidad),
+                ubicacion: formData.ubicacion,
+                operacionActual: formData.operacionActual,
+                proximaOperacion: formData.proximaOperacion,
+                comentario: formData.comentario,
+                stockMinimo: parseInt(formData.stockMinimo) || 10,
+                stockMaximo: parseInt(formData.stockMaximo) || 100,
+                fechaRegistro: new Date().toISOString(),
+                creadoPor: currentUser.name
+              };
+              
+              const updatedInventory = [...inventory, newItem];
+              setInventory(updatedInventory);
+              saveToStorage('inventory-data', updatedInventory);
+              
+              addToHistory('Material agregado', 
+                `${currentUser.name} agregó: ${formData.modelo} (${formData.cantidad} unidades) en ${formData.ubicacion}`, 
+                currentUser);
+              
+              setFormData({
+                modelo: '', equipo: '', cantidad: '', ubicacion: '', 
+                operacionActual: '', proximaOperacion: '', comentario: '', stockMinimo: '10', stockMaximo: '100'
+              });
+              
+              alert('✅ Material agregado directamente (Admin Principal)');
+              return;
+            }
+
+            // Para usuarios normales y admins secundarios: crear solicitud
             const materialRequest = {
               id: Date.now(),
               ...formData,
               cantidad: parseInt(formData.cantidad),
-              stockMinimo: 10,
+              stockMinimo: parseInt(formData.stockMinimo) || 10,
+              stockMaximo: parseInt(formData.stockMaximo) || 100,
               requestedBy: currentUser.name,
               requestedByEmail: currentUser.email,
               requestDate: new Date().toLocaleString('es-MX'),
@@ -795,7 +870,7 @@
 
             setFormData({
               modelo: '', equipo: '', cantidad: '', ubicacion: '', 
-              operacionActual: '', proximaOperacion: '', comentario: '', stockMinimo: '10'
+              operacionActual: '', proximaOperacion: '', comentario: '', stockMinimo: '10', stockMaximo: '100'
             });
 
             alert('✅ Solicitud enviada al administrador');
@@ -804,6 +879,12 @@
           const approveMaterial = (materialId) => {
             const material = pendingMaterials.find(m => m.id === materialId);
             if (material) {
+              // Verificar si ya fue procesada
+              if (material.status !== 'pending') {
+                alert('⚠️ Esta solicitud ya fue procesada por otro administrador');
+                return;
+              }
+              
               const existingItem = inventory.find(item => 
                 item.modelo.toLowerCase() === material.modelo.toLowerCase() &&
                 item.ubicacion.toLowerCase() === material.ubicacion.toLowerCase()
@@ -830,8 +911,9 @@
                   operacionActual: material.operacionActual,
                   proximaOperacion: material.proximaOperacion,
                   comentario: material.comentario,
-                  stockMinimo: 10,
-                  fechaRegistro: new Date().toLocaleDateString(),
+                  stockMinimo: material.stockMinimo || 10,
+                  stockMaximo: material.stockMaximo || 100,
+                  fechaRegistro: new Date().toISOString(),
                   creadoPor: material.requestedBy
                 };
                 updatedInventory = [...inventory, newItem];
@@ -843,7 +925,12 @@
               setInventory(updatedInventory);
               saveToStorage('inventory-data', updatedInventory);
 
-              const updatedPending = pendingMaterials.filter(m => m.id !== materialId);
+              // Marcar como aprobada en lugar de eliminar
+              const updatedPending = pendingMaterials.map(m => 
+                m.id === materialId 
+                  ? { ...m, status: 'approved', processedBy: currentUser.name, processedDate: new Date().toISOString() }
+                  : m
+              );
               setPendingMaterials(updatedPending);
               saveToStorage('pending-materials', updatedPending);
 
@@ -855,7 +942,18 @@
           const rejectMaterial = (materialId) => {
             const material = pendingMaterials.find(m => m.id === materialId);
             if (material) {
-              const updatedPending = pendingMaterials.filter(m => m.id !== materialId);
+              // Verificar si ya fue procesada
+              if (material.status !== 'pending') {
+                alert('⚠️ Esta solicitud ya fue procesada por otro administrador');
+                return;
+              }
+              
+              // Marcar como rechazada en lugar de eliminar
+              const updatedPending = pendingMaterials.map(m => 
+                m.id === materialId 
+                  ? { ...m, status: 'rejected', processedBy: currentUser.name, processedDate: new Date().toISOString() }
+                  : m
+              );
               setPendingMaterials(updatedPending);
               saveToStorage('pending-materials', updatedPending);
 
@@ -866,7 +964,10 @@
 
           const handleEdit = (item) => {
             setEditingItem(item);
-            setFormData(item);
+            setFormData({
+              ...item,
+              stockMaximo: item.stockMaximo || 100
+            });
           };
 
           const handleUpdateMaterial = (e) => {
@@ -881,7 +982,8 @@
               item.id === editingItem.id ? { 
                 ...formData, 
                 id: item.id,
-                stockMinimo: currentUser.role === 'admin' ? parseInt(formData.stockMinimo) || 10 : item.stockMinimo
+                stockMinimo: currentUser.role === 'admin' ? parseInt(formData.stockMinimo) || 10 : item.stockMinimo,
+                stockMaximo: currentUser.role === 'admin' ? parseInt(formData.stockMaximo) || 100 : item.stockMaximo
               } : item
             );
             setInventory(updatedInventory);
@@ -895,7 +997,7 @@
             setEditingItem(null);
             setFormData({
               modelo: '', equipo: '', cantidad: '', ubicacion: '', 
-              operacionActual: '', proximaOperacion: '', comentario: '', stockMinimo: '10'
+              operacionActual: '', proximaOperacion: '', comentario: '', stockMinimo: '10', stockMaximo: '100'
             });
           };
 
@@ -934,11 +1036,20 @@
 
           const checkStockAlerts = (inv) => {
             const lowStock = inv.filter(item => parseInt(item.cantidad) <= (parseInt(item.stockMinimo) || 10));
+            const highStock = inv.filter(item => parseInt(item.cantidad) >= (parseInt(item.stockMaximo) || 100));
+            
             if (lowStock.length > 0 && currentUser?.role === 'admin') {
               const items = lowStock.map(i => `${i.modelo} en ${i.ubicacion} (${i.cantidad})`).join(', ');
               setTimeout(() => {
                 alert(`⚠️ ALERTA DE STOCK BAJO:\n\n${items}\n\nRevisa el dashboard para más detalles.`);
               }, 500);
+            }
+            
+            if (highStock.length > 0 && currentUser?.role === 'admin') {
+              const items = highStock.map(i => `${i.modelo} en ${i.ubicacion} (${i.cantidad})`).join(', ');
+              setTimeout(() => {
+                alert(`📦 ALERTA DE STOCK ALTO:\n\n${items}\n\nExcede el stock máximo.`);
+              }, 1000);
             }
           };
 
@@ -949,12 +1060,13 @@
             }
 
             const wsData = [
-              ['Modelo', 'Equipo', 'Cantidad', 'Stock Mínimo', 'Ubicación', 'Op. Actual', 'Próxima Op.', 'Comentario', 'Fecha', 'Creado Por'],
+              ['Modelo', 'Equipo', 'Cantidad', 'Stock Mínimo', 'Stock Máximo', 'Ubicación', 'Op. Actual', 'Próxima Op.', 'Comentario', 'Fecha', 'Creado Por'],
               ...inventory.map(item => [
                 item.modelo,
                 item.equipo || '-',
                 item.cantidad,
                 item.stockMinimo || 10,
+                item.stockMaximo || 100,
                 item.ubicacion,
                 item.operacionActual || '-',
                 item.proximaOperacion || '-',
@@ -1002,11 +1114,12 @@
                       equipo: row.Equipo || '',
                       cantidad: parseInt(row.Cantidad) || 0,
                       stockMinimo: parseInt(row['Stock Mínimo']) || 10,
+                      stockMaximo: parseInt(row['Stock Máximo']) || 100,
                       ubicacion: row.Ubicación || '',
                       operacionActual: row['Op. Actual'] || '',
                       proximaOperacion: row['Próxima Op.'] || '',
                       comentario: row.Comentario || '',
-                      fechaRegistro: new Date().toLocaleDateString(),
+                      fechaRegistro: new Date().toISOString(),
                       creadoPor: currentUser.name
                     };
                   } catch (err) {
@@ -1175,6 +1288,144 @@
             });
           };
 
+          // Obtener cantidades de modelos por semana
+          const getModelQuantitiesByWeek = () => {
+            const weeksMap = {};
+            
+            // Iterar sobre el inventario actual
+            inventory.forEach(item => {
+              // Buscar cuándo fue agregado
+              const addEntry = changeHistory.find(entry =>
+                entry.action.includes('agregó') &&
+                entry.details.toLowerCase().includes(item.modelo.toLowerCase()) &&
+                entry.details.toLowerCase().includes(item.ubicacion.toLowerCase())
+              );
+              
+              if (addEntry && addEntry.date) {
+                const date = new Date(addEntry.date);
+                const week = getWeekNumber(date);
+                const year = date.getFullYear();
+                const key = `${year}-W${week}`;
+                
+                if (!weeksMap[key]) {
+                  weeksMap[key] = {
+                    week,
+                    year,
+                    key,
+                    display: `Semana ${week} - ${year}`,
+                    models: {},
+                    byOperation: {},
+                    byNextOperation: {},
+                    totalQuantity: 0
+                  };
+                }
+                
+                // Acumular por modelo
+                if (!weeksMap[key].models[item.modelo]) {
+                  weeksMap[key].models[item.modelo] = 0;
+                }
+                weeksMap[key].models[item.modelo] += parseInt(item.cantidad) || 0;
+                
+                // Acumular por operación actual
+                if (item.operacionActual) {
+                  if (!weeksMap[key].byOperation[item.operacionActual]) {
+                    weeksMap[key].byOperation[item.operacionActual] = 0;
+                  }
+                  weeksMap[key].byOperation[item.operacionActual] += parseInt(item.cantidad) || 0;
+                }
+                
+                // Acumular por próxima operación
+                if (item.proximaOperacion) {
+                  if (!weeksMap[key].byNextOperation[item.proximaOperacion]) {
+                    weeksMap[key].byNextOperation[item.proximaOperacion] = 0;
+                  }
+                  weeksMap[key].byNextOperation[item.proximaOperacion] += parseInt(item.cantidad) || 0;
+                }
+                
+                weeksMap[key].totalQuantity += parseInt(item.cantidad) || 0;
+              }
+            });
+            
+            // Ordenar por semana más reciente
+            return Object.values(weeksMap).sort((a, b) => {
+              if (a.year !== b.year) return b.year - a.year;
+              return b.week - a.week;
+            });
+          };
+
+          // Filtrar datos de gráfica
+          const filterChartData = (weeks) => {
+            if (!chartFilterModelo && !chartFilterOperacion && !chartFilterUbicacion) {
+              return weeks;
+            }
+            
+            return weeks.map(week => {
+              let filteredTotalQuantity = 0;
+              const filteredModels = {};
+              const filteredByOperation = {};
+              const filteredByNextOperation = {};
+              
+              // Filtrar inventario de esta semana
+              inventory.forEach(item => {
+                const addEntry = changeHistory.find(entry =>
+                  entry.action.includes('agregó') &&
+                  entry.details.toLowerCase().includes(item.modelo.toLowerCase()) &&
+                  entry.details.toLowerCase().includes(item.ubicacion.toLowerCase())
+                );
+                
+                if (addEntry && addEntry.date) {
+                  const date = new Date(addEntry.date);
+                  const itemWeek = getWeekNumber(date);
+                  const itemYear = date.getFullYear();
+                  
+                  if (itemWeek === week.week && itemYear === week.year) {
+                    const matchModelo = !chartFilterModelo || 
+                      item.modelo.toLowerCase().includes(chartFilterModelo.toLowerCase());
+                    
+                    const matchOperacion = !chartFilterOperacion || 
+                      (item.operacionActual && item.operacionActual.toLowerCase().includes(chartFilterOperacion.toLowerCase()));
+                    
+                    const matchUbicacion = !chartFilterUbicacion || 
+                      item.ubicacion.toLowerCase().includes(chartFilterUbicacion.toLowerCase());
+                    
+                    if (matchModelo && matchOperacion && matchUbicacion) {
+                      const qty = parseInt(item.cantidad) || 0;
+                      
+                      if (!filteredModels[item.modelo]) {
+                        filteredModels[item.modelo] = 0;
+                      }
+                      filteredModels[item.modelo] += qty;
+                      
+                      if (item.operacionActual) {
+                        if (!filteredByOperation[item.operacionActual]) {
+                          filteredByOperation[item.operacionActual] = 0;
+                        }
+                        filteredByOperation[item.operacionActual] += qty;
+                      }
+                      
+                      if (item.proximaOperacion) {
+                        if (!filteredByNextOperation[item.proximaOperacion]) {
+                          filteredByNextOperation[item.proximaOperacion] = 0;
+                        }
+                        filteredByNextOperation[item.proximaOperacion] += qty;
+                      }
+                      
+                      filteredTotalQuantity += qty;
+                    }
+                  }
+                }
+              });
+              
+              return {
+                ...week,
+                models: filteredModels,
+                byOperation: filteredByOperation,
+                byNextOperation: filteredByNextOperation,
+                totalQuantity: filteredTotalQuantity
+              };
+            });
+          };
+
           // Obtener estadísticas de semana específica
           const getWeekStats = (weekKey) => {
             const weeks = getAllWeeks();
@@ -1309,27 +1560,47 @@
 
           // Material con más tiempo detenido
           const getStagnantMaterials = () => {
+            // Fecha actual solo con día (sin horas)
             const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             
             const materialsWithActivity = inventory.map(item => {
-              // Buscar última actividad de este item
+              // Buscar última actividad de este item en el historial
               const lastActivity = changeHistory
                 .filter(entry => 
                   entry.details.toLowerCase().includes(item.modelo.toLowerCase()) &&
                   (entry.details.toLowerCase().includes(item.ubicacion.toLowerCase()) ||
                    entry.action.includes('ajustó') || 
-                   entry.action.includes('editado'))
+                   entry.action.includes('editado') ||
+                   entry.action.includes('agregó'))
                 )
                 .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
               
-              const lastActivityDate = lastActivity ? new Date(lastActivity.date) : new Date(item.fechaRegistro || now);
-              const daysSinceActivity = Math.floor((now - lastActivityDate) / (1000 * 60 * 60 * 24));
+              // Determinar fecha de última actividad
+              let lastActivityDate;
+              
+              if (lastActivity && lastActivity.date) {
+                // Usar fecha del historial
+                const actDate = new Date(lastActivity.date);
+                lastActivityDate = new Date(actDate.getFullYear(), actDate.getMonth(), actDate.getDate());
+              } else if (item.fechaRegistro) {
+                // Usar fecha de registro del item
+                const regDate = new Date(item.fechaRegistro);
+                lastActivityDate = new Date(regDate.getFullYear(), regDate.getMonth(), regDate.getDate());
+              } else {
+                // Si no hay fecha, usar hoy (material sin fecha)
+                lastActivityDate = today;
+              }
+              
+              // Calcular días transcurridos (nunca negativo)
+              const millisDiff = today.getTime() - lastActivityDate.getTime();
+              const daysSinceActivity = Math.max(0, Math.floor(millisDiff / (1000 * 60 * 60 * 24)));
               
               return {
                 ...item,
                 lastActivity: lastActivityDate,
                 daysSinceActivity,
-                lastAction: lastActivity?.action || 'Sin actividad'
+                lastAction: lastActivity?.action || 'Recién agregado'
               };
             });
             
@@ -1847,7 +2118,7 @@
                 )}
 
                 {/* FLUJO DE PROCESOS */}
-                {currentUser?.role === 'admin' && showProcessFlow && (
+                {showProcessFlow && (
                   <div className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl rounded-xl p-6 border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
                     <div className="flex items-center justify-between mb-6">
                       <h2 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -2074,36 +2345,80 @@
                       })()}
                     </div>
 
-                    {/* GRÁFICA ACUMULATIVA */}
+                    {/* GRÁFICA DE CANTIDADES POR SEMANA */}
                     <div className="mb-8">
                       <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                        <LineChart /> Gráfica Acumulativa por Semana
+                        <LineChart /> Cantidades de Modelos por Semana
                       </h3>
+                      
+                      {/* FILTROS DE GRÁFICA */}
+                      <div className="mb-4 p-4 bg-slate-900/30 rounded-lg border border-slate-700">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Filter className="text-blue-400" />
+                          <h4 className="text-white font-semibold text-sm">Filtros de Gráfica</h4>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <input
+                            type="text"
+                            value={chartFilterModelo}
+                            onChange={(e) => setChartFilterModelo(e.target.value)}
+                            placeholder="Modelo..."
+                            className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+                          />
+                          <input
+                            type="text"
+                            value={chartFilterOperacion}
+                            onChange={(e) => setChartFilterOperacion(e.target.value)}
+                            placeholder="Operación Actual..."
+                            className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+                          />
+                          <input
+                            type="text"
+                            value={chartFilterUbicacion}
+                            onChange={(e) => setChartFilterUbicacion(e.target.value)}
+                            placeholder="Ubicación..."
+                            className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+                          />
+                        </div>
+                        {(chartFilterModelo || chartFilterOperacion || chartFilterUbicacion) && (
+                          <button
+                            onClick={() => {
+                              setChartFilterModelo('');
+                              setChartFilterOperacion('');
+                              setChartFilterUbicacion('');
+                            }}
+                            className="mt-3 text-xs text-blue-400 hover:text-blue-300">
+                            Limpiar filtros
+                          </button>
+                        )}
+                      </div>
+                      
                       <div className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-6 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
                         {(() => {
-                          const data = getWeeklyCumulativeData();
-                          const maxValue = data.length > 0 ? data[data.length - 1].cumulative : 0;
+                          const rawData = getModelQuantitiesByWeek();
+                          const data = filterChartData(rawData);
+                          const maxValue = Math.max(...data.map(w => w.totalQuantity), 1);
                           
                           return data.length > 0 ? (
                             <div className="space-y-4">
-                              {/* Línea de gráfica visual */}
+                              {/* Gráfica de barras */}
                               <div className="relative h-64 flex items-end justify-between gap-2">
                                 {data.map((week, i) => {
-                                  const height = (week.cumulative / maxValue) * 100;
-                                  const color = i === data.length - 1 ? 'bg-blue-500' : 'bg-slate-600';
+                                  const height = (week.totalQuantity / maxValue) * 100;
+                                  const color = i === 0 ? 'bg-green-500' : 'bg-blue-500';
                                   
                                   return (
                                     <div key={week.key} className="flex-1 flex flex-col items-center justify-end h-full">
                                       <div className="text-center mb-2">
-                                        <p className="text-xs font-bold text-white">{week.cumulative}</p>
+                                        <p className="text-xs font-bold text-white">{week.totalQuantity}</p>
                                       </div>
                                       <div 
-                                        className={`w-full ${color} rounded-t transition-all duration-500 hover:bg-blue-400`}
+                                        className={`w-full ${color} rounded-t transition-all duration-500 hover:bg-green-400`}
                                         style={{ height: `${height}%` }}
-                                        title={`${week.display}: ${week.cumulative} operaciones`}
+                                        title={`${week.display}: ${week.totalQuantity} unidades`}
                                       ></div>
                                       <div className="mt-2">
-                                        <p className="text-xs text-slate-400 transform -rotate-45 whitespace-nowrap">{week.weekLabel}</p>
+                                        <p className="text-xs text-slate-400 transform -rotate-45 whitespace-nowrap">S{week.week}</p>
                                       </div>
                                     </div>
                                   );
@@ -2114,169 +2429,107 @@
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-slate-700">
                                 <div className="text-center">
                                   <p className="text-2xl font-bold text-white">{data.length}</p>
-                                  <p className="text-sm text-slate-400">Semanas registradas</p>
+                                  <p className="text-sm text-slate-400">Semanas</p>
                                 </div>
                                 <div className="text-center">
-                                  <p className="text-2xl font-bold text-green-400">{maxValue}</p>
-                                  <p className="text-sm text-slate-400">Total acumulado</p>
+                                  <p className="text-2xl font-bold text-green-400">
+                                    {data.reduce((sum, w) => sum + w.totalQuantity, 0)}
+                                  </p>
+                                  <p className="text-sm text-slate-400">Total unidades</p>
                                 </div>
                                 <div className="text-center">
                                   <p className="text-2xl font-bold text-blue-400">
-                                    {data.length > 0 ? Math.round(maxValue / data.length) : 0}
+                                    {data.length > 0 ? Math.round(data.reduce((sum, w) => sum + w.totalQuantity, 0) / data.length) : 0}
                                   </p>
                                   <p className="text-sm text-slate-400">Promedio/semana</p>
                                 </div>
                                 <div className="text-center">
                                   <p className="text-2xl font-bold text-purple-400">
-                                    {data.length > 1 ? data[data.length - 1].stats.total : 0}
+                                    {Object.keys(data.length > 0 ? data[0].models : {}).length}
                                   </p>
-                                  <p className="text-sm text-slate-400">Última semana</p>
+                                  <p className="text-sm text-slate-400">Modelos distintos</p>
                                 </div>
                               </div>
                             </div>
                           ) : (
                             <div className="text-center py-12">
                               <LineChart className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                              <p className="text-slate-400">No hay datos semanales disponibles</p>
+                              <p className="text-slate-400">No hay datos de cantidades disponibles</p>
                             </div>
                           );
                         })()}
                       </div>
                     </div>
 
-                    {/* ESTADÍSTICAS POR OPERACIÓN */}
+                    {/* DISTRIBUCIÓN POR MODELOS */}
                     <div className="mb-8">
                       <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                        <BarChart2 /> Operaciones por Semana
+                        <BarChart2 /> Cantidades por Modelo
                       </h3>
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        {getAllWeeks().slice(0, 6).map((week, index) => (
-                          <div key={week.key} className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border ${
-                            index === 0 ? 'border-blue-500 bg-blue-900/20' : 'border-slate-700'
-                          }`}>
-                            <div className="flex items-center justify-between mb-3">
-                              <div>
-                                <h4 className="text-white font-bold">{week.display}</h4>
-                                {index === 0 && <p className="text-blue-400 text-xs">Actual</p>}
-                              </div>
-                              <div className="text-right">
-                                <p className="text-2xl font-bold text-white">{week.stats.total}</p>
-                                <p className="text-slate-400 text-xs">total</p>
-                              </div>
-                            </div>
-                            
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-green-400">✅ Entradas:</span>
-                                <div className="text-right">
-                                  <span className="font-bold text-green-400">{week.stats.entriesCount}</span>
-                                  <span className="text-green-300 text-xs ml-1">({week.stats.quantitiesAdded}u)</span>
-                                </div>
-                              </div>
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-red-400">❌ Salidas:</span>
-                                <div className="text-right">
-                                  <span className="font-bold text-red-400">{week.stats.exitsCount}</span>
-                                  <span className="text-red-300 text-xs ml-1">({week.stats.quantitiesRemoved}u)</span>
-                                </div>
-                              </div>
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-blue-400">✏️ Ediciones:</span>
-                                <div className="text-right">
-                                  <span className="font-bold text-blue-400">{week.stats.editsCount}</span>
-                                  <span className="text-blue-300 text-xs ml-1">({week.stats.quantitiesEdited}u)</span>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            {/* Top operaciones */}
-                            <div className="mt-3 pt-3 border-t border-slate-700">
-                              <p className="text-xs text-slate-400 mb-2">Top operaciones:</p>
-                              {Object.entries(week.stats.byOperation)
-                                .sort((a, b) => b[1] - a[1])
-                                .slice(0, 3)
-                                .map(([op, count], i) => (
-                                  <div key={i} className="text-xs text-slate-300 truncate">
-                                    • {op}: <span className="text-white font-semibold">{count}</span>
-                                  </div>
-                                ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* COMPARADOR DE SEMANAS */}
-                    <div>
-                      <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                        <TrendingUpIcon /> Comparar Semanas
-                      </h3>
-                      <div className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-6 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                          <div>
-                            <label className="block text-sm text-slate-400 mb-2">Semana 1:</label>
-                            <select
-                              value={weekCompare1}
-                              onChange={(e) => setWeekCompare1(e.target.value)}
-                              className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white">
-                              <option value="">Seleccionar semana...</option>
-                              {getAllWeeks().map(week => (
-                                <option key={week.key} value={week.key}>{week.display}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-sm text-slate-400 mb-2">Semana 2:</label>
-                            <select
-                              value={weekCompare2}
-                              onChange={(e) => setWeekCompare2(e.target.value)}
-                              className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white">
-                              <option value="">Seleccionar semana...</option>
-                              {getAllWeeks().map(week => (
-                                <option key={week.key} value={week.key}>{week.display}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                        
-                        {weekCompare1 && weekCompare2 && (() => {
-                          const comparison = compareWeeks(weekCompare1, weekCompare2);
-                          if (!comparison) return null;
+                        {(() => {
+                          const rawData = getModelQuantitiesByWeek();
+                          const data = filterChartData(rawData);
                           
-                          return (
-                            <div className="mt-6 p-4 bg-blue-900/20 border border-blue-500 rounded-lg">
-                              <h4 className="text-white font-bold mb-4">Resultados de Comparación:</h4>
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div className="text-center">
-                                  <p className="text-slate-400 text-xs mb-1">Diferencia Total</p>
-                                  <p className={`text-2xl font-bold ${comparison.totalDiff > 0 ? 'text-green-400' : comparison.totalDiff < 0 ? 'text-red-400' : 'text-slate-400'}`}>
-                                    {comparison.totalDiff > 0 ? '+' : ''}{comparison.totalDiff}
-                                  </p>
-                                  <p className={`text-xs ${comparison.percentChange > 0 ? 'text-green-400' : comparison.percentChange < 0 ? 'text-red-400' : 'text-slate-400'}`}>
-                                    {comparison.percentChange > 0 ? '+' : ''}{comparison.percentChange}%
-                                  </p>
+                          return data.slice(0, 6).map((week, index) => (
+                            <div key={week.key} className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border ${
+                              index === 0 ? 'border-green-500 bg-green-900/20' : 'border-slate-700'
+                            }`}>
+                              <div className="flex items-center justify-between mb-3">
+                                <div>
+                                  <h4 className="text-white font-bold">{week.display}</h4>
+                                  {index === 0 && <p className="text-green-400 text-xs">Actual</p>}
                                 </div>
-                                <div className="text-center">
-                                  <p className="text-slate-400 text-xs mb-1">Entradas</p>
-                                  <p className={`text-2xl font-bold ${comparison.entriesDiff > 0 ? 'text-green-400' : comparison.entriesDiff < 0 ? 'text-red-400' : 'text-slate-400'}`}>
-                                    {comparison.entriesDiff > 0 ? '+' : ''}{comparison.entriesDiff}
-                                  </p>
+                                <div className="text-right">
+                                  <p className="text-2xl font-bold text-white">{week.totalQuantity}</p>
+                                  <p className="text-slate-400 text-xs">unidades totales</p>
                                 </div>
-                                <div className="text-center">
-                                  <p className="text-slate-400 text-xs mb-1">Salidas</p>
-                                  <p className={`text-2xl font-bold ${comparison.exitsDiff > 0 ? 'text-green-400' : comparison.exitsDiff < 0 ? 'text-red-400' : 'text-slate-400'}`}>
-                                    {comparison.exitsDiff > 0 ? '+' : ''}{comparison.exitsDiff}
-                                  </p>
+                              </div>
+                              
+                              {/* Top Modelos por Cantidad */}
+                              <div className="mb-3">
+                                <p className="text-xs text-blue-400 font-semibold mb-2">Modelos con más cantidad:</p>
+                                <div className="space-y-1">
+                                  {Object.entries(week.models)
+                                    .sort((a, b) => b[1] - a[1])
+                                    .slice(0, 8)
+                                    .map(([modelo, qty], i) => (
+                                      <div key={i} className="flex items-center justify-between text-xs">
+                                        <span className="text-slate-300 truncate">{modelo}</span>
+                                        <div className="flex items-center gap-2">
+                                          <div className="w-16 bg-slate-700 rounded-full h-2 overflow-hidden">
+                                            <div 
+                                              className="bg-green-500 h-full" 
+                                              style={{ width: `${(qty / week.totalQuantity) * 100}%` }}
+                                            ></div>
+                                          </div>
+                                          <span className="text-green-400 font-bold w-12 text-right">{qty}u</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  {Object.keys(week.models).length === 0 && (
+                                    <p className="text-xs text-slate-500">Sin datos</p>
+                                  )}
                                 </div>
-                                <div className="text-center">
-                                  <p className="text-slate-400 text-xs mb-1">Ediciones</p>
-                                  <p className={`text-2xl font-bold ${comparison.editsDiff > 0 ? 'text-green-400' : comparison.editsDiff < 0 ? 'text-red-400' : 'text-slate-400'}`}>
-                                    {comparison.editsDiff > 0 ? '+' : ''}{comparison.editsDiff}
+                              </div>
+                              
+                              {/* Estadísticas */}
+                              <div className="pt-3 border-t border-slate-700 grid grid-cols-2 gap-2 text-xs">
+                                <div className="text-center bg-slate-800/50 rounded p-2">
+                                  <p className="text-slate-400">Modelos distintos</p>
+                                  <p className="text-white font-bold text-lg">{Object.keys(week.models).length}</p>
+                                </div>
+                                <div className="text-center bg-slate-800/50 rounded p-2">
+                                  <p className="text-slate-400">Promedio/modelo</p>
+                                  <p className="text-white font-bold text-lg">
+                                    {Object.keys(week.models).length > 0 
+                                      ? Math.round(week.totalQuantity / Object.keys(week.models).length)
+                                      : 0}
                                   </p>
                                 </div>
                               </div>
                             </div>
-                          );
+                          ));
                         })()}
                       </div>
                     </div>
@@ -2357,12 +2610,22 @@
                           </div>
                           {getFilteredHistory().map(entry => (
                             <div key={entry.id} className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
-                              <p className="text-white font-semibold">{entry.action}</p>
-                              <p className="text-slate-300 text-sm mt-1">{entry.details}</p>
-                              <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
-                                <span>👤 {entry.user}</span>
-                                <span>📧 {entry.userEmail}</span>
-                                <span>🕐 {entry.timestamp}</span>
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1">
+                                  <p className="text-white font-semibold">{entry.action}</p>
+                                  <p className="text-slate-300 text-sm mt-1">{entry.details}</p>
+                                  <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
+                                    <span>👤 {entry.user}</span>
+                                    <span>📧 {entry.userEmail}</span>
+                                    <span>🕐 {entry.timestamp}</span>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => deleteHistoryEntry(entry.id)}
+                                  className="text-red-400 hover:text-red-300 p-2"
+                                  title="Eliminar entrada">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
                               </div>
                             </div>
                           ))}
@@ -2408,11 +2671,11 @@
                 )}
 
                 {/* SOLICITUDES DE MATERIAL */}
-                {currentUser?.role === 'admin' && pendingMaterials.length > 0 && (
+                {currentUser?.role === 'admin' && pendingMaterials.filter(m => m.status === 'pending').length > 0 && (
                   <div className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl rounded-xl p-6 border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
-                    <h2 className="text-xl font-bold text-white mb-4">📄 Solicitudes de Material ({pendingMaterials.length})</h2>
+                    <h2 className="text-xl font-bold text-white mb-4">📄 Solicitudes de Material ({pendingMaterials.filter(m => m.status === 'pending').length})</h2>
                     <div className="space-y-3">
-                      {pendingMaterials.map(material => (
+                      {pendingMaterials.filter(m => m.status === 'pending').map(material => (
                         <div key={material.id} className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
                           <div className="flex items-start justify-between gap-4 flex-wrap">
                             <div className="flex-1">
@@ -2491,6 +2754,15 @@
                           onChange={(e) => setFormData({ ...formData, stockMinimo: e.target.value })}
                           className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border border-yellow-600 rounded-lg text-white focus:ring-2 focus:ring-yellow-500`}
                           placeholder="10" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          Stock Máximo 🔒 <span className="text-xs text-yellow-400">(Solo Admin)</span>
+                        </label>
+                        <input type="number" value={formData.stockMaximo}
+                          onChange={(e) => setFormData({ ...formData, stockMaximo: e.target.value })}
+                          className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border border-yellow-600 rounded-lg text-white focus:ring-2 focus:ring-yellow-500`}
+                          placeholder="100" />
                       </div>
                     )}
                     <div>
