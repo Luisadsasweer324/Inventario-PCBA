@@ -1164,6 +1164,7 @@
             const totalRecords = inventory.length;
             const totalQuantity = inventory.reduce((sum, item) => sum + parseInt(item.cantidad), 0);
             const lowStock = getLowStockItems().length;
+            const highStock = inventory.filter(item => parseInt(item.cantidad) >= (parseInt(item.stockMaximo) || 100)).length;
             const critical = getCriticalStockItems().length;
             const locations = [...new Set(inventory.map(i => i.ubicacion))].length;
             const uniqueModels = [...new Set(inventory.map(i => i.modelo))].length;
@@ -1172,7 +1173,8 @@
               totalRecords,
               totalQuantity,
               uniqueModels,
-              lowStock, 
+              lowStock,
+              highStock,
               critical, 
               locations 
             };
@@ -1925,6 +1927,17 @@
                           <TrendingDown className="w-12 h-12 text-red-400" />
                         </div>
                       </div>
+
+                      <div className="bg-purple-600/20 border border-purple-500 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-purple-300 text-sm">Stock Alto</p>
+                            <p className="text-3xl font-bold text-white">{stats.highStock}</p>
+                            <p className="text-purple-200 text-xs mt-1">Excede máximo</p>
+                          </div>
+                          <Package className="w-12 h-12 text-purple-400" />
+                        </div>
+                      </div>
                     </div>
 
                     {lowStockItems.length > 0 && (
@@ -1957,6 +1970,37 @@
                         </div>
                       </div>
                     )}
+
+                    {(() => {
+                      const highStockItems = inventory.filter(item => parseInt(item.cantidad) >= (parseInt(item.stockMaximo) || 100));
+                      return highStockItems.length > 0 && (
+                        <div className="bg-purple-900/30 border-2 border-purple-500 rounded-lg p-6 mb-6">
+                          <h3 className="text-xl font-bold text-purple-300 mb-4 flex items-center gap-2">
+                            <Package /> 📦 Productos con Stock Alto
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {highStockItems.map(item => (
+                              <div key={item.id} className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border border-purple-500`}>
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <p className="text-white font-bold text-lg">{item.modelo}</p>
+                                    <div className="flex items-center gap-2 mt-1 text-sm">
+                                      <MapPin className="w-4 h-4 text-purple-400" />
+                                      <span className="text-purple-300">{item.ubicacion}</span>
+                                    </div>
+                                    <p className="text-slate-300 text-sm mt-1">📦 {item.equipo || 'Sin equipo'}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-2xl font-bold text-purple-400">{item.cantidad}</p>
+                                    <p className="text-slate-400 text-xs">Max: {item.stockMaximo || 100}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <div className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-6 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
@@ -2745,25 +2789,27 @@
                         className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
                         placeholder="Rack A-5" required />
                     </div>
-                    {currentUser?.role === 'admin' && editingItem && (
-                      <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                          Stock Mínimo 🔒 <span className="text-xs text-yellow-400">(Solo Admin)</span>
-                        </label>
-                        <input type="number" value={formData.stockMinimo}
-                          onChange={(e) => setFormData({ ...formData, stockMinimo: e.target.value })}
-                          className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border border-yellow-600 rounded-lg text-white focus:ring-2 focus:ring-yellow-500`}
-                          placeholder="10" />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                          Stock Máximo 🔒 <span className="text-xs text-yellow-400">(Solo Admin)</span>
-                        </label>
-                        <input type="number" value={formData.stockMaximo}
-                          onChange={(e) => setFormData({ ...formData, stockMaximo: e.target.value })}
-                          className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border border-yellow-600 rounded-lg text-white focus:ring-2 focus:ring-yellow-500`}
-                          placeholder="100" />
-                      </div>
+                    {currentUser?.role === 'admin' && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">
+                            Stock Mínimo 🔒 <span className="text-xs text-yellow-400">(Solo Admin)</span>
+                          </label>
+                          <input type="number" value={formData.stockMinimo}
+                            onChange={(e) => setFormData({ ...formData, stockMinimo: e.target.value })}
+                            className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border border-yellow-600 rounded-lg text-white focus:ring-2 focus:ring-yellow-500`}
+                            placeholder="10" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">
+                            Stock Máximo 🔒 <span className="text-xs text-yellow-400">(Solo Admin)</span>
+                          </label>
+                          <input type="number" value={formData.stockMaximo}
+                            onChange={(e) => setFormData({ ...formData, stockMaximo: e.target.value })}
+                            className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border border-yellow-600 rounded-lg text-white focus:ring-2 focus:ring-yellow-500`}
+                            placeholder="100" />
+                        </div>
+                      </>
                     )}
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-2">Op. Actual</label>
