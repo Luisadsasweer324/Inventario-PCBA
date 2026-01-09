@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inventario</title>
+    <title>Sistema de Inventario - Versión Corregida</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -68,15 +68,15 @@
     <script>
         // ==================== CONFIGURACIÓN DE FIREBASE ====================
         const firebaseConfig = {
-        apiKey: "AIzaSyBdaZe_ep_B25I5pYtJLap46-_xJmYupPI",
-        authDomain: "inventario-empresa-3455c.firebaseapp.com",
-        projectId: "inventario-empresa-3455c",
-        storageBucket: "inventario-empresa-3455c.firebasestorage.app",
-        messagingSenderId: "556200473276",
-        appId: "1:556200473276:web:b9fd510b9b52cade59d6b9",
-        measurementId: "G-FF2332NPFS"
+            apiKey: "TU_API_KEY",
+            authDomain: "TU_PROJECT_ID.firebaseapp.com",
+            databaseURL: "https://TU_PROJECT_ID-default-rtdb.firebaseio.com",
+            projectId: "TU_PROJECT_ID",
+            storageBucket: "TU_PROJECT_ID.appspot.com",
+            messagingSenderId: "TU_SENDER_ID",
+            appId: "TU_APP_ID"
         };
-        
+
         const isFirebaseConfigured = firebaseConfig.apiKey !== "TU_API_KEY";
         let database = null;
         let firebaseInitialized = false;
@@ -260,6 +260,13 @@
                 <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
                 <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
                 <line x1="12" y1="22.08" x2="12" y2="12"/>
+            </svg>
+        );
+
+        const Tag = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+                <line x1="7" y1="7" x2="7.01" y2="7"/>
             </svg>
         );
 
@@ -489,12 +496,13 @@
           
           // Blocklists configurables
           const [blocklists, setBlocklists] = useState({
-            ubicaciones: ['Fila 1', 'Fila 2', 'Fila 3', 'Fila 4', 'Fila 5', 'Fila 6', 'Fila 7', 'Fila 8', 'Fila 9', 'Fila 10', 'Fila 11', 'Fila 12', 'Fila 13'],
-            operaciones: ['75', '200', 'Escaner', 'Conformal', '800', '805', '900'],
-            equipos: ['ICT', 'ROUTER', 'WAVE SOLDER', 'STITCH PIN'],
+            ubicaciones: ['Almacén Principal', 'Taller 1', 'Taller 2', 'Bodega A', 'Bodega B'],
+            operaciones: ['Corte', 'Ensamblaje', 'Pulido', 'Inspección', 'Empaque', 'Pintura'],
+            equipos: ['Equipo A', 'Equipo B', 'Equipo C', 'Línea 1', 'Línea 2'],
             modelos: []
-          }); 
+          });
           const [showBlocklistConfig, setShowBlocklistConfig] = useState(false);
+          const [quickAddMode, setQuickAddMode] = useState(false);
 
           // Listeners de Firebase en tiempo real
           useEffect(() => {
@@ -1828,12 +1836,24 @@
                       className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm">
                       {darkMode ? <Sun /> : <Moon />}
                     </button>
+                    <button onClick={() => setShowProcessFlow(!showProcessFlow)}
+                      className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm">
+                      <GitBranch /> Flujo
+                    </button>
                     {currentUser?.role === 'admin' && (
                       <>
-                        <button onClick={() => setShowUserManager(!showUserManager)}
-                          className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm">
-                          <Users /> Usuarios
-                        </button>
+                        {currentUser.email === 'admin@empresa.com' && (
+                          <>
+                            <button onClick={() => setShowBlocklistConfig(!showBlocklistConfig)}
+                              className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-lg text-sm">
+                              <Settings className="w-5 h-5" /> Config
+                            </button>
+                            <button onClick={() => setShowUserManager(!showUserManager)}
+                              className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm">
+                              <Users /> Usuarios
+                            </button>
+                          </>
+                        )}
                         <button onClick={() => setShowDashboard(!showDashboard)}
                           className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm">
                           <BarChart /> Dashboard
@@ -1846,25 +1866,25 @@
                           className="flex items-center gap-2 bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg text-sm">
                           <Activity /> Analytics
                         </button>
-                        <button onClick={() => setShowProcessFlow(!showProcessFlow)}
-                          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm">
-                          <GitBranch /> Flujo
-                        </button>
                         <button onClick={() => setShowWeeklyStats(!showWeeklyStats)}
                           className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm">
                           <Calendar /> Semanas
                         </button>
-                        <input
-                          type="file"
-                          ref={fileInputRef}
-                          onChange={handleImportExcel}
-                          accept=".xlsx,.xls"
-                          style={{ display: 'none' }}
-                        />
-                        <button onClick={() => fileInputRef.current.click()}
-                          className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm">
-                          <Upload /> Importar
-                        </button>
+                        {currentUser.email === 'admin@empresa.com' && (
+                          <>
+                            <input
+                              type="file"
+                              ref={fileInputRef}
+                              onChange={handleImportExcel}
+                              accept=".xlsx,.xls"
+                              style={{ display: 'none' }}
+                            />
+                            <button onClick={() => fileInputRef.current.click()}
+                              className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm">
+                              <Upload /> Importar
+                            </button>
+                          </>
+                        )}
                         <button onClick={exportToExcel}
                           className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm">
                           <Download /> Exportar
@@ -1875,8 +1895,9 @@
                       className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">
                       <LogOut /> Salir
                     </button>
-                  </div>
-                </div>
+                      </div>
+                      </div>
+
               </header>
 
               <div className="max-w-7xl mx-auto p-4 space-y-6">
@@ -1920,6 +1941,13 @@
                                     <Shield className="w-4 h-4" />
                                     {user.role === 'admin' ? 'Quitar Admin' : 'Hacer Admin'}
                                   </button>
+                                  {user.role === 'admin' && (
+                                    <button 
+                                      onClick={() => toggleApprovalPermission(user.id)}
+                                      className={`flex items-center gap-1 ${user.canApprove ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-600 hover:bg-gray-700'} text-white px-3 py-1 rounded text-sm`}>
+                                      {user.canApprove ? '✅ Puede aprobar' : '⛔ No puede aprobar'}
+                                    </button>
+                                  )}
                                   <button 
                                     onClick={() => deleteUser(user.id)}
                                     className="flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm">
@@ -1937,6 +1965,205 @@
                           </div>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* PANEL DE CONFIGURACIÓN DE LISTAS (SOLO ADMIN PRINCIPAL) */}
+                {currentUser?.email === 'admin@empresa.com' && showBlocklistConfig && (
+                  <div className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl rounded-xl p-6 border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                        <Settings /> Configuración de Listas
+                      </h2>
+                      <button onClick={() => setShowBlocklistConfig(false)}
+                        className="text-slate-400 hover:text-white">
+                        <XCircle />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* UBICACIONES */}
+                      <div className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                        <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                          <MapPin className="text-blue-400" /> Ubicaciones
+                        </h3>
+                        <div className="space-y-2 mb-3 max-h-60 overflow-y-auto">
+                          {blocklists.ubicaciones.map((item, index) => (
+                            <div key={index} className="flex items-center justify-between bg-slate-800/50 p-2 rounded">
+                              <span className="text-slate-300 text-sm">{item}</span>
+                              <button 
+                                onClick={() => removeFromBlocklist('ubicaciones', index)}
+                                className="text-red-400 hover:text-red-300">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            placeholder="Nueva ubicación..."
+                            className="flex-1 px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter' && e.target.value.trim()) {
+                                addToBlocklist('ubicaciones', e.target.value);
+                                e.target.value = '';
+                              }
+                            }}
+                          />
+                          <button 
+                            onClick={(e) => {
+                              const input = e.target.previousElementSibling;
+                              if (input.value.trim()) {
+                                addToBlocklist('ubicaciones', input.value);
+                                input.value = '';
+                              }
+                            }}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm">
+                            + Agregar
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* OPERACIONES */}
+                      <div className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                        <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                          <Settings className="text-green-400" /> Operaciones
+                        </h3>
+                        <div className="space-y-2 mb-3 max-h-60 overflow-y-auto">
+                          {blocklists.operaciones.map((item, index) => (
+                            <div key={index} className="flex items-center justify-between bg-slate-800/50 p-2 rounded">
+                              <span className="text-slate-300 text-sm">{item}</span>
+                              <button 
+                                onClick={() => removeFromBlocklist('operaciones', index)}
+                                className="text-red-400 hover:text-red-300">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            placeholder="Nueva operación..."
+                            className="flex-1 px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter' && e.target.value.trim()) {
+                                addToBlocklist('operaciones', e.target.value);
+                                e.target.value = '';
+                              }
+                            }}
+                          />
+                          <button 
+                            onClick={(e) => {
+                              const input = e.target.previousElementSibling;
+                              if (input.value.trim()) {
+                                addToBlocklist('operaciones', input.value);
+                                input.value = '';
+                              }
+                            }}
+                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded text-sm">
+                            + Agregar
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* EQUIPOS */}
+                      <div className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                        <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                          <Package className="text-yellow-400" /> Equipos
+                        </h3>
+                        <div className="space-y-2 mb-3 max-h-60 overflow-y-auto">
+                          {blocklists.equipos.map((item, index) => (
+                            <div key={index} className="flex items-center justify-between bg-slate-800/50 p-2 rounded">
+                              <span className="text-slate-300 text-sm">{item}</span>
+                              <button 
+                                onClick={() => removeFromBlocklist('equipos', index)}
+                                className="text-red-400 hover:text-red-300">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            placeholder="Nuevo equipo..."
+                            className="flex-1 px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter' && e.target.value.trim()) {
+                                addToBlocklist('equipos', e.target.value);
+                                e.target.value = '';
+                              }
+                            }}
+                          />
+                          <button 
+                            onClick={(e) => {
+                              const input = e.target.previousElementSibling;
+                              if (input.value.trim()) {
+                                addToBlocklist('equipos', input.value);
+                                input.value = '';
+                              }
+                            }}
+                            className="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-2 rounded text-sm">
+                            + Agregar
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* MODELOS */}
+                      <div className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                        <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                          <Tag className="text-purple-400" /> Modelos
+                        </h3>
+                        <div className="space-y-2 mb-3 max-h-60 overflow-y-auto">
+                          {blocklists.modelos.length === 0 ? (
+                            <p className="text-slate-500 text-xs italic">No hay modelos predefinidos</p>
+                          ) : (
+                            blocklists.modelos.map((item, index) => (
+                              <div key={index} className="flex items-center justify-between bg-slate-800/50 p-2 rounded">
+                                <span className="text-slate-300 text-sm">{item}</span>
+                                <button 
+                                  onClick={() => removeFromBlocklist('modelos', index)}
+                                  className="text-red-400 hover:text-red-300">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            placeholder="Nuevo modelo..."
+                            className="flex-1 px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter' && e.target.value.trim()) {
+                                addToBlocklist('modelos', e.target.value);
+                                e.target.value = '';
+                              }
+                            }}
+                          />
+                          <button 
+                            onClick={(e) => {
+                              const input = e.target.previousElementSibling;
+                              if (input.value.trim()) {
+                                addToBlocklist('modelos', input.value);
+                                input.value = '';
+                              }
+                            }}
+                            className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded text-sm">
+                            + Agregar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 p-4 bg-blue-900/20 border border-blue-700 rounded-lg">
+                      <p className="text-blue-300 text-sm">
+                        💡 <strong>Tip:</strong> Estas listas aparecen como sugerencias al escribir en el formulario de material. Los usuarios pueden seleccionar de la lista o escribir valores personalizados.
+                      </p>
                     </div>
                   </div>
                 )}
@@ -2030,6 +2257,45 @@
                         </div>
                       </div>
                     )}
+
+                    {(() => {
+                      const highStockItems = inventory.filter(item => 
+                        parseInt(item.cantidad) >= (parseInt(item.stockMaximo) || 100)
+                      );
+                      return highStockItems.length > 0 && (
+                        <div className="bg-blue-900/30 border-2 border-blue-500 rounded-lg p-6 mb-6 stock-alert">
+                          <h3 className="text-xl font-bold text-blue-300 mb-4 flex items-center gap-2">
+                            <Package /> 📦 Productos con Stock Excedido
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {highStockItems.map(item => (
+                              <div key={item.id} className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border border-blue-500`}>
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <p className="text-white font-bold">{item.modelo}</p>
+                                    <p className="text-slate-400 text-sm flex items-center gap-1">
+                                      <MapPin /> {item.ubicacion}
+                                    </p>
+                                    {item.equipo && (
+                                      <p className="text-slate-500 text-xs">Equipo: {item.equipo}</p>
+                                    )}
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-2xl font-bold text-blue-400">
+                                      {item.cantidad}
+                                    </p>
+                                    <p className="text-slate-400 text-xs">Max: {item.stockMaximo || 100}</p>
+                                    <p className="text-blue-300 text-xs font-semibold">
+                                      +{parseInt(item.cantidad) - (parseInt(item.stockMaximo) || 100)} exceso
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <div className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-6 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
@@ -2744,7 +3010,7 @@
                 )}
 
                 {/* SOLICITUDES DE MATERIAL */}
-                {currentUser?.role === 'admin' && pendingMaterials.filter(m => m.status === 'pending').length > 0 && (
+                {currentUser?.role === 'admin' && (currentUser.canApprove || currentUser.email === 'admin@empresa.com') && pendingMaterials.filter(m => m.status === 'pending').length > 0 && (
                   <div className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl rounded-xl p-6 border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
                     <h2 className="text-xl font-bold text-white mb-4">📄 Solicitudes de Material ({pendingMaterials.filter(m => m.status === 'pending').length})</h2>
                     <div className="space-y-3">
@@ -2785,11 +3051,84 @@
 
                 {/* FORMULARIO */}
                 <div className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl rounded-xl p-6 border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
-                  <h2 className="text-xl font-bold text-white mb-4">
-                    {editingItem ? '✏️ Editar Material' : '➕ Solicitar Agregar Material'}
-                  </h2>
-                  <form onSubmit={editingItem ? handleUpdateMaterial : handleRequestMaterial} 
-                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold text-white">
+                      {editingItem ? '✏️ Editar Material' : '➕ Solicitar Agregar Material'}
+                    </h2>
+                    {!editingItem && (
+                      <button 
+                        type="button"
+                        onClick={() => setQuickAddMode(!quickAddMode)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                          quickAddMode 
+                            ? 'bg-orange-600 hover:bg-orange-700 text-white' 
+                            : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                        }`}>
+                        ⚡ {quickAddMode ? 'Modo Rápido ON' : 'Modo Rápido OFF'}
+                      </button>
+                    )}
+                  </div>
+                  
+                  {!editingItem && quickAddMode ? (
+                    /* MODO RÁPIDO */
+                    <form onSubmit={handleRequestMaterial} className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">Modelo *</label>
+                          <input type="text" value={formData.modelo}
+                            onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
+                            list="modelos-list"
+                            className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-lg focus:ring-2 focus:ring-blue-500"
+                            placeholder="ABC-123" required autoFocus />
+                          {blocklists.modelos.length > 0 && (
+                            <datalist id="modelos-list">
+                              {blocklists.modelos.map((m, i) => <option key={i} value={m} />)}
+                            </datalist>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">Cantidad *</label>
+                          <input type="number" value={formData.cantidad}
+                            onChange={(e) => setFormData({ ...formData, cantidad: e.target.value })}
+                            className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-lg focus:ring-2 focus:ring-blue-500"
+                            placeholder="0" required />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">Ubicación *</label>
+                          <input type="text" value={formData.ubicacion}
+                            onChange={(e) => setFormData({ ...formData, ubicacion: e.target.value })}
+                            list="ubicaciones-list"
+                            className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-lg focus:ring-2 focus:ring-blue-500"
+                            placeholder="Selecciona..." required />
+                          <datalist id="ubicaciones-list">
+                            {blocklists.ubicaciones.map((ub, i) => <option key={i} value={ub} />)}
+                          </datalist>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button type="submit"
+                          className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold text-lg">
+                          <PlusCircle className="w-6 h-6" /> Agregar Rápido
+                        </button>
+                        <button type="button"
+                          onClick={() => {
+                            setFormData({
+                              modelo: '', equipo: '', cantidad: '', ubicacion: '', 
+                              operacionActual: '', proximaOperacion: '', comentario: '', stockMinimo: '10', stockMaximo: '100'
+                            });
+                          }}
+                          className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-lg font-semibold">
+                          Limpiar
+                        </button>
+                      </div>
+                      <p className="text-slate-400 text-sm text-center">
+                        💡 Campos opcionales se omiten en modo rápido. Cambia a modo completo para más opciones.
+                      </p>
+                    </form>
+                  ) : (
+                    /* MODO COMPLETO */
+                    <form onSubmit={editingItem ? handleUpdateMaterial : handleRequestMaterial} 
+                          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-2">Modelo *</label>
                       <input type="text" value={formData.modelo}
@@ -2830,7 +3169,7 @@
                         ))}
                       </datalist>
                     </div>
-                   {currentUser?.role === 'admin' && (
+                    {currentUser?.role === 'admin' && (
                       <>
                         <div>
                           <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -2899,6 +3238,7 @@
                       )}
                     </div>
                   </form>
+                  )}
                 </div>
 
                 {/* TABLA DE INVENTARIO */}
@@ -3004,6 +3344,7 @@
             </div>
           );
         }
+      
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<InventoryApp />);
