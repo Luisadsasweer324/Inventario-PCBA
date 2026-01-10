@@ -3384,7 +3384,7 @@
                     onChange={(e) => setFormData({ ...formData, operacionActual: e.target.value })}
                     className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
                   >
-                    <option value="">Selecciona una operación...</option>
+                    <option value="">Selecciona la operacion actual..</option>
                     {blocklists.operaciones.map((op, i) => (
                       <option key={i} value={op}>{op}</option>
                     ))}
@@ -3397,7 +3397,7 @@
                     onChange={(e) => setFormData({ ...formData, proximaOperacion: e.target.value })}
                     className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
                   >
-                    <option value="">Selecciona una operación...</option>
+                    <option value="">Selecciona la siguiente operacion...</option>
                     {blocklists.operaciones.map((op, i) => (
                       <option key={i} value={op}>{op}</option>
                     ))}
