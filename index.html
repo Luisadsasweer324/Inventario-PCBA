@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sistema de Inventario</title>
+  <title>Sistema de Inventario </title>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -78,24 +78,6 @@
 
     ::-webkit-scrollbar-thumb:hover {
       background: #64748b;
-    }
-
-    @keyframes alert-pulse {
-
-      0%,
-      100% {
-        opacity: 1;
-        transform: scale(1);
-      }
-
-      50% {
-        opacity: 0.8;
-        transform: scale(1.05);
-      }
-    }
-
-    .stock-alert {
-      animation: alert-pulse 2s ease-in-out infinite;
     }
   </style>
 </head>
@@ -506,6 +488,7 @@
       const [darkMode, setDarkMode] = useState(false);
       const [connectionStatus, setConnectionStatus] = useState(firebaseInitialized ? 'connected' : 'local');
 
+
       // Filtros de historial
       const [historyFilterUser, setHistoryFilterUser] = useState('');
       const [historyFilterStartDate, setHistoryFilterStartDate] = useState('');
@@ -530,7 +513,7 @@
 
       const [formData, setFormData] = useState({
         modelo: '', equipo: '', cantidad: '', ubicacion: '',
-        operacionActual: '', proximaOperacion: '', comentario: '', stockMinimo: '10', stockMaximo: '100'
+        operacionActual: '', proximaOperacion: '', comentario: '', stockMinimo: '10', stockMaximo: '100', fechaEtiqueta: new Date().toISOString().split('T')[0]
       });
 
       const [users, setUsers] = useState([
@@ -542,6 +525,7 @@
       const fileInputRef = useRef(null);
 
       // Modo rápido batch
+      const [batchMode, setBatchMode] = useState(false); // Activar/Desactivar modo lote
       const [batchItems, setBatchItems] = useState([]);
 
       // Configuración de stock por modelo (global)
@@ -557,6 +541,47 @@
       const [showBlocklistConfig, setShowBlocklistConfig] = useState(false);
       const [quickAddMode, setQuickAddMode] = useState(false);
       const [expandedModels, setExpandedModels] = useState({});
+      // ... otros estados ...
+
+
+      // ==================== NUEVO: LÓGICA DE SELECCIÓN MÚLTIPLE ====================
+      const [selectionMode, setSelectionMode] = useState(false);
+      const [selectedItems, setSelectedItems] = useState([]);
+
+      const toggleSelectItem = (id) => {
+        if (selectedItems.includes(id)) {
+          setSelectedItems(selectedItems.filter(itemId => itemId !== id));
+        } else {
+          setSelectedItems([...selectedItems, id]);
+        }
+      };
+
+      const deleteSelectedItems = async () => {
+        if (selectedItems.length === 0) return;
+
+        if (confirm(`¿Estás seguro de eliminar ${selectedItems.length} items seleccionados de forma permanente?`)) {
+          const updatedInventory = inventory.filter(item => !selectedItems.includes(item.id));
+          setInventory(updatedInventory);
+          await saveToStorage('inventory-data', updatedInventory);
+
+          addToHistory('Eliminación Múltiple',
+            `${currentUser.name} eliminó ${selectedItems.length} items del inventario.`,
+            currentUser
+          );
+
+          setSelectedItems([]);
+          setSelectionMode(false);
+          alert('✅ Items eliminados correctamente');
+        }
+      };
+
+      const selectAllVisible = () => {
+        if (selectedItems.length === filteredInventory.length) {
+          setSelectedItems([]);
+        } else {
+          setSelectedItems(filteredInventory.map(item => item.id));
+        }
+      };
 
       // Listeners de Firebase en tiempo real
       useEffect(() => {
@@ -932,6 +957,93 @@
           return;
         }
 
+        // Función para agregar a la lista temporal (Cola de envío)
+        const addToBatch = (e) => {
+          e.preventDefault();
+
+          // ✅ Agregamos validación para fechaEtiqueta
+          if (!formData.modelo || !formData.cantidad || !formData.ubicacion || !formData.fechaEtiqueta) {
+            alert('⚠️ Completa: Modelo, Cantidad, Ubicación y Fecha de Etiqueta');
+            return;
+          }
+
+          const newItem = {
+            id: Date.now(),
+            ...formData,
+            cantidad: parseInt(formData.cantidad)
+          };
+
+          setBatchItems([...batchItems, newItem]);
+
+          // UX: Limpiamos modelo y cantidad, pero DEJAMOS la Fecha y Ubicación
+          // (normalmente se escanean items de la misma fecha y lugar)
+          setFormData({
+            ...formData,
+            modelo: '',
+            cantidad: ''
+          });
+
+          document.getElementById('inputModelo')?.focus();
+
+          // Limpiamos SOLO modelo y cantidad para agilizar la carga repetitiva en la misma ubicación
+          setFormData({
+            ...formData,
+            modelo: '',
+            cantidad: ''
+          });
+
+          // Poner foco de nuevo en el input de modelo (opcional, mejora UX)
+          document.getElementById('inputModelo')?.focus();
+        };
+
+        // Función para eliminar un item de la lista temporal
+        const removeFromBatch = (tempId) => {
+          setBatchItems(batchItems.filter(item => item.id !== tempId));
+        };
+
+        // Función para ENVIAR TODO EL LOTE
+        const submitBatch = async () => {
+          if (batchItems.length === 0) return alert('La lista está vacía');
+
+          const timestamp = new Date().toISOString();
+          const dateDisplay = new Date().toLocaleString('es-MX');
+
+          // Preparar los objetos finales
+          const itemsToProcess = batchItems.map(item => ({
+            ...item,
+            id: Date.now() + Math.random(), // ID final único
+            fechaRegistro: timestamp,
+            requestDate: dateDisplay,
+            requestedBy: currentUser.name,
+            requestedByEmail: currentUser.email,
+            status: currentUser.role === 'admin' ? 'approved' : 'pending', // Si es admin entra directo, si no, pendiente
+            creadoPor: currentUser.name
+          }));
+
+          if (currentUser.role === 'admin') {
+            // === LÓGICA DE ADMIN (ENTRADA DIRECTA) ===
+            const updatedInventory = [...inventory, ...itemsToProcess];
+            setInventory(updatedInventory);
+            await saveToStorage('inventory-data', updatedInventory);
+            addToHistory('Carga por Lote', `Admin agregó ${itemsToProcess.length} items masivamente`, currentUser);
+            alert(`✅ Se agregaron ${itemsToProcess.length} items al inventario.`);
+          } else {
+            // === LÓGICA DE USUARIO (SOLICITUD) ===
+            const updatedPending = [...pendingMaterials, ...itemsToProcess];
+            setPendingMaterials(updatedPending);
+            await saveToStorage('pending-materials', updatedPending);
+            addToHistory('Solicitud por Lote', `${currentUser.name} solicitó ${itemsToProcess.length} items`, currentUser);
+            alert(`✅ Se enviaron ${itemsToProcess.length} solicitudes al administrador.`);
+          }
+
+          // Limpiar todo
+          setBatchItems([]);
+          setBatchMode(false);
+          setFormData({
+            modelo: '', equipo: '', cantidad: '', ubicacion: '',
+            operacionActual: '', proximaOperacion: '', comentario: '', stockMinimo: '10', stockMaximo: '100'
+          });
+        };
         // Obtener stock del modelo (si existe) o del formulario
         const stockMin = modelStockConfig[formData.modelo]?.stockMinimo || parseInt(formData.stockMinimo) || 10;
         const stockMax = modelStockConfig[formData.modelo]?.stockMaximo || parseInt(formData.stockMaximo) || 100;
@@ -2270,7 +2382,7 @@
                   {/* EQUIPOS */}
                   <div className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
                     <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-                      <Package className="text-yellow-400" /> Equipos
+                      <Package className="w-10 h-10" /> Equipos
                     </h3>
                     <div className="space-y-2 mb-3 max-h-60 overflow-y-auto">
                       {(blocklists?.equipos || []).map((item, index) => (
@@ -2508,9 +2620,9 @@
                   );
 
                   return highStockModels.length > 0 && (
-                    <div className="bg-blue-900/30 border-2 border-blue-500 rounded-lg p-6 mb-6 stock-alert">
+                    <div className="bg-blue-200/30 border-2 border-blue-200 rounded-lg p-6 mb-6 stock-alert">
                       <h3 className="text-xl font-bold text-blue-300 mb-4 flex items-center gap-2">
-                        <Package /> 📦 Productos con Stock Excedido
+                        📦 Productos con Stock Excedido
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {highStockModels.map(([modelo, data]) => (
@@ -3296,347 +3408,378 @@
               </div>
             )}
 
-            {/* FORMULARIO */}
+            {/* FORMULARIO CON MODO LOTE Y FECHA DE ETIQUETA */}
             <div className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl rounded-xl p-6 border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
-              <h2 className="text-xl font-bold text-white mb-4">
-                {editingItem ? '✏️ Editar Material' : '➕ Solicitar Agregar Material'}
-              </h2>
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  {editingItem ? '✏️ Editar Material' : (batchMode ? '⚡ Carga Masiva (Lotes)' : '➕ Solicitar Material')}
+                </h2>
 
-              <form onSubmit={editingItem ? handleUpdateMaterial : handleRequestMaterial}
-                className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div>
+                {!editingItem && (
+                  <button
+                    onClick={() => {
+                      setBatchMode(!batchMode);
+                      setBatchItems([]);
+                    }}
+                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${batchMode
+                        ? 'bg-yellow-500 text-slate-900 shadow-[0_0_15px_rgba(234,179,8,0.5)]'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                  >
+                    {batchMode ? '⚡ Modo Lote ACTIVO' : '⚪ Activar Modo Lote'}
+                  </button>
+                )}
+              </div>
+
+              <form onSubmit={batchMode ? addToBatch : (editingItem ? handleUpdateMaterial : handleRequestMaterial)} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"> {/* Cambiado a 4 columnas para espacio */}
+
+                  {/* Modelo */}
+                  <div className="lg:col-span-1">
                     <label className="block text-sm font-medium text-slate-300 mb-2">Modelo *</label>
-                    <input type="text" value={formData.modelo}
+                    <input
+                      id="inputModelo"
+                      type="text"
+                      value={formData.modelo}
                       onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
                       className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
-                      placeholder="ABC-123" required />
+                      placeholder="ABC-123"
+                      required
+                    />
                   </div>
+
+                  {/* Cantidad */}
+                  <div className="lg:col-span-1">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Cantidad *</label>
+                    <input
+                      type="number"
+                      value={formData.cantidad}
+                      onChange={(e) => setFormData({ ...formData, cantidad: e.target.value })}
+                      className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
+                      placeholder="0"
+                      required
+                    />
+                  </div>
+
+                  {/* Ubicación */}
+                  <div className="lg:col-span-1">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Ubicación *</label>
+                    <select
+                      value={formData.ubicacion}
+                      onChange={(e) => setFormData({ ...formData, ubicacion: e.target.value })}
+                      className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
+                      required
+                    >
+                      <option value="">Selecciona...</option>
+                      {blocklists.ubicaciones.map((ub, i) => <option key={i} value={ub}>{ub}</option>)}
+                    </select>
+                  </div>
+
+                  {/* ✅ NUEVO CAMPO: Fecha Etiqueta */}
+                  <div className="lg:col-span-1">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">📅 Fecha Etiqueta *</label>
+                    <input
+                      type="date"
+                      value={formData.fechaEtiqueta}
+                      onChange={(e) => setFormData({ ...formData, fechaEtiqueta: e.target.value })}
+                      className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
+                      required
+                    />
+                  </div>
+
+                  {/* Campos Opcionales en segunda fila */}
+                  <div className="lg:col-span-1">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Equipo</label>
+                    <select
+                      value={formData.equipo}
+                      onChange={(e) => setFormData({ ...formData, equipo: e.target.value })}
+                      className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white`}
+                    >
+                      <option value="">Selecciona...</option>
+                      {blocklists.equipos.map((eq, i) => <option key={i} value={eq}>{eq}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="lg:col-span-1">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Op. Actual</label>
+                    <select
+                      value={formData.operacionActual}
+                      onChange={(e) => setFormData({ ...formData, operacionActual: e.target.value })}
+                      className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white`}
+                    >
+                      <option value="">Selecciona...</option>
+                      {blocklists.operaciones.map((op, i) => <option key={i} value={op}>{op}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="lg:col-span-2">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Comentario</label>
+                    <input
+                      type="text"
+                      value={formData.comentario}
+                      onChange={(e) => setFormData({ ...formData, comentario: e.target.value })}
+                      className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white`}
+                      placeholder="Opcional..."
+                    />
+                  </div>
+
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Equipo</label>
-                  <select
-                    value={formData.equipo}
-                    onChange={(e) => setFormData({ ...formData, equipo: e.target.value })}
-                    className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
-                  >
-                    <option value="">Selecciona un equipo...</option>
-                    {blocklists.equipos.map((eq, i) => (
-                      <option key={i} value={eq}>{eq}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Cantidad *</label>
-                  <input type="number" value={formData.cantidad}
-                    onChange={(e) => setFormData({ ...formData, cantidad: e.target.value })}
-                    className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
-                    placeholder="0" required />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Ubicación *</label>
-                  <select
-                    value={formData.ubicacion}
-                    onChange={(e) => setFormData({ ...formData, ubicacion: e.target.value })}
-                    className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
-                    required
-                  >
-                    <option value="">Selecciona una ubicación...</option>
-                    {blocklists.ubicaciones.map((ub, i) => (
-                      <option key={i} value={ub}>{ub}</option>
-                    ))}
-                  </select>
-                </div>
-                {currentUser?.role === 'admin' && editingItem && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">
-                        Stock Mínimo 🔒 <span className="text-xs text-yellow-400">(Solo Admin)</span>
-                      </label>
-                      <input
-                        type="number"
-                        value={formData?.stockMinimo || ''}
-                        onChange={(e) => setFormData({ ...formData, stockMinimo: e.target.value })}
-                        className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border border-yellow-600 rounded-lg text-white focus:ring-2 focus:ring-yellow-500`}
-                        placeholder="10"
-                        min="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">
-                        Stock Máximo 🔒 <span className="text-xs text-yellow-400">(Solo Admin)</span>
-                      </label>
-                      <input
-                        type="number"
-                        value={formData?.stockMaximo || ''}
-                        onChange={(e) => setFormData({ ...formData, stockMaximo: e.target.value })}
-                        className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border border-yellow-600 rounded-lg text-white focus:ring-2 focus:ring-yellow-500`}
-                        placeholder="100"
-                        min="0"
-                      />
-                    </div>
-                  </>
-                )}
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Op. Actual</label>
-                  <select
-                    value={formData.operacionActual}
-                    onChange={(e) => setFormData({ ...formData, operacionActual: e.target.value })}
-                    className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
-                  >
-                    <option value="">Selecciona la operacion actual..</option>
-                    {blocklists.operaciones.map((op, i) => (
-                      <option key={i} value={op}>{op}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Próxima Op.</label>
-                  <select
-                    value={formData.proximaOperacion}
-                    onChange={(e) => setFormData({ ...formData, proximaOperacion: e.target.value })}
-                    className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
-                  >
-                    <option value="">Selecciona la siguiente operacion...</option>
-                    {blocklists.operaciones.map((op, i) => (
-                      <option key={i} value={op}>{op}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="md:col-span-2 lg:col-span-3">
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Comentario</label>
-                  <textarea value={formData.comentario}
-                    onChange={(e) => setFormData({ ...formData, comentario: e.target.value })}
-                    className={`w-full px-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
-                    placeholder="Notas..." rows="2"></textarea>
-                </div>
-                <div className="md:col-span-2 lg:col-span-3 flex gap-2">
+
+                <div className="flex gap-3 pt-2">
                   <button type="submit"
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold">
-                    <Plus /> {editingItem ? 'Actualizar' : 'Solicitar'}
+                    className={`flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-lg font-bold shadow-lg transition-transform active:scale-95 ${batchMode
+                        ? 'bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                      }`}>
+                    {batchMode ? <PlusCircle className="w-5 h-5" /> : <Plus />}
+                    {editingItem ? 'Actualizar Item' : (batchMode ? 'Agregar a la Lista' : 'Enviar Solicitud')}
                   </button>
+
                   {editingItem && (
                     <button type="button" onClick={() => {
-                      setEditingItem(null);
-                      setFormData({
+                      setEditingItem(null); setFormData({
                         modelo: '', equipo: '', cantidad: '', ubicacion: '',
-                        operacionActual: '', proximaOperacion: '', comentario: '', stockMinimo: '10'
+                        operacionActual: '', proximaOperacion: '', comentario: '', stockMinimo: '10', stockMaximo: '100',
+                        fechaEtiqueta: new Date().toISOString().split('T')[0]
                       });
                     }}
-                      className="bg-slate-600 hover:bg-slate-700 text-white px-6 py-2 rounded-lg font-semibold">
+                      className="bg-slate-600 hover:bg-slate-700 text-white px-6 py-3 rounded-lg font-semibold">
                       Cancelar
                     </button>
                   )}
                 </div>
               </form>
 
-            </div>
+              {/* TABLA DE PREVISUALIZACIÓN DE LOTE (Con Fecha) */}
+              {batchMode && batchItems.length > 0 && (
+                <div className="mt-8 animate-fade-in">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-white font-bold flex items-center gap-2">
+                      <span className="bg-yellow-500 text-slate-900 px-2 rounded text-xs">{batchItems.length}</span>
+                      Items en Cola
+                    </h3>
+                    <button onClick={() => setBatchItems([])} className="text-xs text-red-400 hover:text-red-300 underline">
+                      Limpiar lista
+                    </button>
+                  </div>
 
-            {/* INVENTARIO UNIFICADO - POR MODELO CON UBICACIONES */}
-            <div className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl rounded-xl p-6 border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
-              <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
-                <h2 className="text-xl font-bold text-white">📦 Inventario por Modelo ({(() => {
-                  const models = {};
-                  inventory.forEach(item => models[item.modelo] = true);
-                  return Object.keys(models).length;
-                })()} modelos)</h2>
-                <div className="relative">
-                  <Search />
-                  <input type="text" value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className={`pl-10 pr-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
-                    placeholder="Buscar modelo..." />
-                </div>
-              </div>
+                  <div className="bg-slate-900/50 rounded-lg border border-slate-700 overflow-hidden">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-slate-800 text-slate-300">
+                        <tr>
+                          <th className="p-3">Fecha Etiqueta</th>
+                          <th className="p-3">Modelo</th>
+                          <th className="p-3">Cant.</th>
+                          <th className="p-3">Ubicación</th>
+                          <th className="p-3">Equipo</th>
+                          <th className="p-3 text-right">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-700">
+                        {batchItems.map((item, idx) => (
+                          <tr key={item.id} className="hover:bg-slate-800/50">
+                            {/* Visualización completa de fecha */}
+                            <td className="p-3 text-blue-300 font-mono">
+                              {item.fechaEtiqueta}
+                            </td>
+                            <td className="p-3 font-medium text-white">{item.modelo}</td>
+                            <td className="p-3 text-green-400 font-bold">{item.cantidad}</td>
+                            <td className="p-3 text-slate-300">{item.ubicacion}</td>
+                            <td className="p-3 text-slate-400 text-xs">{item.equipo || '-'}</td>
+                            <td className="p-3 text-right">
+                              <button
+                                onClick={() => removeFromBatch(item.id)}
+                                className="text-red-400 hover:bg-red-900/30 p-1.5 rounded transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
 
-              {filteredInventory.length === 0 ? (
-                <div className="text-center py-12">
-                  <Package className="w-16 h-16 text-slate-600 mx-auto" />
-                  <p className="text-slate-400 mt-4">No hay items</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className={`border-b ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
-                        <th className="text-left py-3 px-3 text-slate-300 font-semibold">Modelo</th>
-                        <th className="text-left py-3 px-3 text-slate-300 font-semibold">Total</th>
-                        <th className="text-left py-3 px-3 text-slate-300 font-semibold">Ubicaciones</th>
-                        <th className="text-left py-3 px-3 text-slate-300 font-semibold">Stock Mín</th>
-                        <th className="text-left py-3 px-3 text-slate-300 font-semibold">Stock Máx</th>
-                        <th className="text-left py-3 px-3 text-slate-300 font-semibold">Estado</th>
-                        <th className="text-left py-3 px-3 text-slate-300 font-semibold">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(() => {
-                        // Agrupar por modelo
-                        const modelGroups = {};
-                        filteredInventory.forEach(item => {
-                          if (!modelGroups[item.modelo]) {
-                            modelGroups[item.modelo] = {
-                              items: [],
-                              total: 0,
-                              stockMinimo: modelStockConfig[item.modelo]?.stockMinimo || parseInt(item.stockMinimo) || 10,
-                              stockMaximo: modelStockConfig[item.modelo]?.stockMaximo || parseInt(item.stockMaximo) || 100
-                            };
-                          }
-                          modelGroups[item.modelo].items.push(item);
-                          modelGroups[item.modelo].total += parseInt(item.cantidad) || 0;
-                        });
-
-                        return Object.entries(modelGroups).map(([modelo, data]) => {
-                          const isLow = data.total <= data.stockMinimo;
-                          const isCritical = data.total <= (data.stockMinimo * 0.5);
-                          const isHigh = data.total >= data.stockMaximo;
-                          const isExpanded = expandedModels[modelo];
-
-                          return (
-                            <React.Fragment key={modelo}>
-                              {/* FILA PRINCIPAL DEL MODELO */}
-                              <tr className={`border-b-2 ${darkMode ? 'border-slate-600' : 'border-slate-600'} hover:bg-slate-800/50 transition-colors`}>
-                                <td className="py-4 px-4">
-                                  <button
-                                    onClick={() => setExpandedModels({ ...expandedModels, [modelo]: !isExpanded })}
-                                    className="flex items-center gap-2 text-left w-full hover:text-blue-400 transition-colors">
-                                    <span className="text-blue-400 text-lg">{isExpanded ? '▼' : '▶'}</span>
-                                    <span className="text-white font-bold text-lg">{modelo}</span>
-                                  </button>
-                                </td>
-                                <td className="py-4 px-4">
-                                  <span className={`text-2xl font-bold ${isCritical ? 'text-red-400' : isLow ? 'text-yellow-400' : isHigh ? 'text-blue-400' : 'text-green-400'}`}>
-                                    {data.total}
-                                  </span>
-                                </td>
-                                <td className="py-4 px-4">
-                                  <span className="text-slate-300 font-medium">{data.items.length} ubicación(es)</span>
-                                </td>
-                                <td className="py-4 px-4">
-                                  <span className="text-slate-300 font-medium">{data.stockMinimo}</span>
-                                </td>
-                                <td className="py-4 px-4">
-                                  <span className="text-slate-300 font-medium">{data.stockMaximo}</span>
-                                </td>
-                                <td className="py-4 px-4">
-                                  {isCritical ? (
-                                    <span className="bg-red-600 text-white px-3 py-1.5 rounded-md text-sm font-bold inline-flex items-center gap-1">
-                                      🔴 CRÍTICO
-                                    </span>
-                                  ) : isHigh ? (
-                                    <span className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-bold inline-flex items-center gap-1">
-                                      📦 ALTO
-                                    </span>
-                                  ) : isLow ? (
-                                    <span className="bg-yellow-600 text-white px-3 py-1.5 rounded-md text-sm font-bold inline-flex items-center gap-1">
-                                      ⚠️ BAJO
-                                    </span>
-                                  ) : (
-                                    <span className="bg-green-600 text-white px-3 py-1.5 rounded-md text-sm font-bold inline-flex items-center gap-1">
-                                      ✅ OK
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="py-4 px-4">
-                                  {currentUser?.role === 'admin' && (
-                                    <button
-                                      onClick={async () => {
-                                        const newMin = prompt(`Stock Mínimo para ${modelo}:`, data.stockMinimo);
-                                        const newMax = prompt(`Stock Máximo para ${modelo}:`, data.stockMaximo);
-                                        if (newMin && newMax) {
-                                          const newConfig = {
-                                            ...modelStockConfig,
-                                            [modelo]: {
-                                              stockMinimo: parseInt(newMin),
-                                              stockMaximo: parseInt(newMax)
-                                            }
-                                          };
-                                          setModelStockConfig(newConfig);
-                                          await window.storage.set('model-stock-config', JSON.stringify(newConfig));
-
-                                          // Actualizar todos los items del modelo
-                                          const updatedInventory = inventory.map(item =>
-                                            item.modelo === modelo
-                                              ? { ...item, stockMinimo: parseInt(newMin), stockMaximo: parseInt(newMax) }
-                                              : item
-                                          );
-                                          setInventory(updatedInventory);
-                                          await saveToStorage('inventory-data', updatedInventory);
-                                          alert(`✅ Stock actualizado para ${modelo}`);
-                                        }
-                                      }}
-                                      className="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1.5 rounded-md text-sm font-semibold transition-colors">
-                                      ⚙️ Config
-                                    </button>
-                                  )}
-                                </td>
-                              </tr>
-
-                              {/* FILAS DE UBICACIONES (solo si está expandido) */}
-                              {isExpanded && data.items.map((item, idx) => (
-                                <tr key={item.id} className={`border-b ${darkMode ? 'border-slate-700/50' : 'border-slate-700/50'} bg-slate-800/30`}>
-                                  <td className="py-3 px-4 pl-12">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-slate-500">📍</span>
-                                      <span className="text-slate-300 font-medium">{item.ubicacion}</span>
-                                    </div>
-                                  </td>
-                                  <td className="py-3 px-4">
-                                    <div className="flex items-center gap-2">
-                                      <button onClick={() => handleAdjustQuantity(item.id, -1)}
-                                        className="w-7 h-7 bg-red-600 hover:bg-red-700 text-white rounded-md flex items-center justify-center font-bold transition-colors">
-                                        -
-                                      </button>
-                                      <span className="font-bold text-white text-lg min-w-[40px] text-center">{item.cantidad}</span>
-                                      <button onClick={() => handleAdjustQuantity(item.id, 1)}
-                                        className="w-7 h-7 bg-green-600 hover:bg-green-700 text-white rounded-md flex items-center justify-center font-bold transition-colors">
-                                        +
-                                      </button>
-                                    </div>
-                                  </td>
-                                  <td className="py-3 px-4 text-slate-400 text-sm">
-                                    {item.equipo || '-'}
-                                  </td>
-                                  <td className="py-3 px-4 text-slate-400 text-sm" colSpan="2">
-                                    {item.operacionActual || '-'}
-                                    {item.proximaOperacion && ` → ${item.proximaOperacion}`}
-                                  </td>
-                                  <td className="py-3 px-4 text-slate-400 text-sm">
-                                    {item.comentario || '-'}
-                                  </td>
-                                  <td className="py-3 px-4">
-                                    <div className="flex gap-2">
-                                      <button onClick={() => handleEdit(item)}
-                                        className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors">
-                                        <Edit2 />
-                                      </button>
-                                      {currentUser?.role === 'admin' && (
-                                        <button onClick={() => handleDelete(item.id)}
-                                          className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors">
-                                          <Trash2 />
-                                        </button>
-                                      )}
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </React.Fragment>
-                          );
-                        });
-                      })()}
-                    </tbody>
-                  </table>
+                  <button
+                    onClick={submitBatch}
+                    className="w-full mt-4 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <CheckCircle /> Confirmar y Enviar {batchItems.length} Items
+                  </button>
                 </div>
               )}
-
-              <div className="mt-4 p-4 bg-blue-900/20 border border-blue-700 rounded-lg">
-                <p className="text-blue-300 text-sm flex items-center gap-2">
-                  <span className="text-lg">💡</span>
-                  <strong>Tip:</strong> Haz clic en ▶ para expandir y ver todas las ubicaciones del modelo. El stock se calcula sumando todas las ubicaciones.
-                </p>
-              </div>
             </div>
           </div>
+
+          {/* INVENTARIO UNIFICADO - POR MODELO CON UBICACIONES CON SELECCIÓN MÚLTIPLE */}
+          <div className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl rounded-xl p-6 border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
+              <div className="flex items-center gap-4">
+                <h2 className="text-xl font-bold text-white">📦 Inventario por Modelo</h2>
+                <button
+                  onClick={() => {
+                    setSelectionMode(!selectionMode);
+                    if (selectionMode) setSelectedItems([]);
+                  }}
+                  className={`px-3 py-1 rounded-lg text-sm font-semibold transition-colors ${selectionMode ? 'bg-yellow-500 text-slate-900' : 'bg-slate-700 text-white hover:bg-slate-600'}`}
+                >
+                  {selectionMode ? '🚫 Cancelar Selección' : '✔️ Selección Múltiple'}
+                </button>
+              </div>
+
+              <div className="relative">
+                <Search />
+                <input type="text" value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className={`pl-10 pr-4 py-2 ${darkMode ? 'bg-slate-900/50' : 'bg-slate-900/50'} border ${darkMode ? 'border-slate-600' : 'border-slate-600'} rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
+                  placeholder="Buscar modelo..." />
+              </div>
+            </div>
+
+            {/* BARRA DE ACCIONES MASIVAS */}
+            {selectionMode && selectedItems.length > 0 && (
+              <div className="mb-4 p-4 bg-blue-600/20 border border-blue-500 rounded-lg flex items-center justify-between animate-fade-in">
+                <span className="text-white font-medium">
+                  {selectedItems.length} items seleccionados
+                </span>
+                <div className="flex gap-2">
+                  <button onClick={selectAllVisible} className="px-3 py-1 bg-blue-500 hover:bg-blue-400 text-white rounded text-sm">
+                    Seleccionar Todo
+                  </button>
+                  <button onClick={deleteSelectedItems} className="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-sm flex items-center gap-1">
+                    <Trash2 /> Eliminar Seleccionados
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {filteredInventory.length === 0 ? (
+              <div className="text-center py-12">
+                <Package className="w-16 h-16 text-slate-600 mx-auto" />
+                <p className="text-slate-400 mt-4">No hay items</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className={`border-b ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+                      <th className="py-3 px-3"></th>
+                      <th className="text-left py-3 px-3 text-slate-300 font-semibold">Modelo</th>
+                      <th className="text-left py-3 px-3 text-slate-300 font-semibold">Total</th>
+                      <th className="text-left py-3 px-3 text-slate-300 font-semibold">Ubicaciones</th>
+                      <th className="text-left py-3 px-3 text-slate-300 font-semibold">Stock Mín/Máx</th>
+                      <th className="text-left py-3 px-3 text-slate-300 font-semibold">Estado</th>
+                      <th className="text-left py-3 px-3 text-slate-300 font-semibold">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const modelGroups = {};
+                      filteredInventory.forEach(item => {
+                        if (!modelGroups[item.modelo]) {
+                          modelGroups[item.modelo] = {
+                            items: [],
+                            total: 0,
+                            stockMinimo: modelStockConfig[item.modelo]?.stockMinimo || parseInt(item.stockMinimo) || 10,
+                            stockMaximo: modelStockConfig[item.modelo]?.stockMaximo || parseInt(item.stockMaximo) || 100
+                          };
+                        }
+                        modelGroups[item.modelo].items.push(item);
+                        modelGroups[item.modelo].total += parseInt(item.cantidad) || 0;
+                      });
+
+                      return Object.entries(modelGroups).map(([modelo, data]) => {
+                        const isLow = data.total <= data.stockMinimo;
+                        const isCritical = data.total <= (data.stockMinimo * 0.5);
+                        const isHigh = data.total >= data.stockMaximo;
+                        const isExpanded = expandedModels[modelo];
+
+                        return (
+                          <React.Fragment key={modelo}>
+                            <tr className={`border-b ${darkMode ? 'border-slate-700' : 'border-slate-200'} hover:bg-slate-800/20`}>
+                              <td className="py-4 px-2 text-center">
+                                <button onClick={() => setExpandedModels({ ...expandedModels, [modelo]: !isExpanded })} className="text-blue-400">
+                                  {isExpanded ? '▼' : '▶'}
+                                </button>
+                              </td>
+                              <td className="py-4 px-3">
+                                <span className="text-white font-bold text-lg">{modelo}</span>
+                              </td>
+                              <td className="py-4 px-3 text-2xl font-bold text-white">{data.total}</td>
+                              <td className="py-4 px-3 text-slate-300">{data.items.length} sitios</td>
+                              <td className="py-4 px-3 text-slate-400">{data.stockMinimo} / {data.stockMaximo}</td>
+                              <td className="py-4 px-3">
+                                <span className={`px-2 py-1 rounded text-xs font-bold ${isCritical ? 'bg-red-600 text-white' : isLow ? 'bg-yellow-600 text-white' : isHigh ? 'bg-blue-600 text-white' : 'bg-green-600 text-white'}`}>
+                                  {isCritical ? 'CRÍTICO' : isLow ? 'BAJO' : isHigh ? 'ALTO' : 'OK'}
+                                </span>
+                              </td>
+                              <td className="py-4 px-3">
+                                {currentUser?.role === 'admin' && (
+                                  <button onClick={() => handleEdit(data.items[0])} className="text-blue-400 hover:underline">Configurar</button>
+                                )}
+                              </td>
+                            </tr>
+
+                            {/* FILAS DE UBICACIONES HIJAS */}
+                            {isExpanded && data.items.map((item) => (
+                              <tr key={item.id} className={`${darkMode ? 'bg-slate-900/40' : 'bg-slate-100/50'} border-b border-slate-700/30 transition-all`}>
+                                <td className="py-3 px-2 text-center">
+                                  {selectionMode && (
+                                    <input
+                                      type="checkbox"
+                                      className="w-4 h-4 rounded border-slate-600 text-blue-600 focus:ring-blue-500"
+                                      checked={selectedItems.includes(item.id)}
+                                      onChange={() => toggleSelectItem(item.id)}
+                                    />
+                                  )}
+                                </td>
+                                <td className="py-3 px-3 pl-8 text-slate-300">
+                                  📍 {item.ubicacion}
+                                </td>
+                                <td className="py-3 px-3">
+                                  <div className="flex items-center gap-2">
+                                    <button onClick={() => handleAdjustQuantity(item.id, -1)} className="w-6 h-6 bg-red-900/50 text-red-400 rounded">-</button>
+                                    <span className="font-bold text-white w-8 text-center">{item.cantidad}</span>
+                                    <button onClick={() => handleAdjustQuantity(item.id, 1)} className="w-6 h-6 bg-green-900/50 text-green-400 rounded">+</button>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-3 text-slate-400 text-xs italic">{item.equipo || 'Sin equipo'}</td>
+                                <td className="py-3 px-3 text-slate-400 text-xs" colSpan="2">
+                                  {item.operacionActual || 'N/A'} {item.proximaOperacion ? `➡ ${item.proximaOperacion}` : ''}
+                                </td>
+                                <td className="py-3 px-3">
+                                  <div className="flex gap-2">
+                                    <button onClick={() => handleEdit(item)} className="p-1.5 bg-blue-600/20 text-blue-400 rounded hover:bg-blue-600/40">
+                                      <Edit2 />
+                                    </button>
+                                    {currentUser?.role === 'admin' && (
+                                      <button onClick={() => handleDelete(item.id)} className="p-1.5 bg-red-600/20 text-red-400 rounded hover:bg-red-600/40">
+                                        <Trash2 />
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </React.Fragment>
+                        );
+                      });
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 p-4 bg-blue-900/20 border border-blue-700 rounded-lg">
+            <p className="text-blue-300 text-sm flex items-center gap-2">
+              <span className="text-lg">💡</span>
+              <strong>Tip:</strong> Haz clic en ▶ para expandir y ver todas las ubicaciones del modelo. El stock se calcula sumando todas las ubicaciones.
+            </p>
+          </div>
         </div>
+      
+
       );
     }
 
