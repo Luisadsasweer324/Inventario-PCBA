@@ -5689,16 +5689,12 @@
                                           >
                                             <Edit2 />
                                           </button>
-                                          {currentUser?.role === "admin" && (
-                                            <button
-                                              onClick={() =>
-                                                handleDelete(item.id)
-                                              }
-                                              className="p-1.5 bg-red-600/20 text-red-400 rounded hover:bg-red-600/40"
-                                            >
-                                              <Trash2 />
-                                            </button>
-                                          )}
+                                          <button
+                                            onClick={() => handleDelete(item.id)}
+                                            className="p-1.5 bg-red-600/20 text-red-400 rounded hover:bg-red-600/40"
+                                          >
+                                            <Trash2 />
+                                          </button>
                                         </div>
                                       </td>
                                     </tr>
