@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sistema de Inventario </title>
+  <title>Sistema de Inventario PCBA</title>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -500,11 +500,17 @@
       const [weekCompare1, setWeekCompare1] = useState('');
       const [weekCompare2, setWeekCompare2] = useState('');
 
-      // Filtros de semanas
       const [weekFilterModelo, setWeekFilterModelo] = useState('');
       const [weekFilterUbicacion, setWeekFilterUbicacion] = useState('');
       const [weekFilterOperacion, setWeekFilterOperacion] = useState('');
       const [weekFilterEquipo, setWeekFilterEquipo] = useState('');
+
+      // Nuevos estados para análisis avanzado de fechas
+      const [dateRangeType, setDateRangeType] = useState('week'); // 'day', 'week', 'month', 'year'
+      const [dateFieldType, setDateFieldType] = useState('registro'); // 'registro' o 'etiqueta'
+      const [chartViewType, setChartViewType] = useState('bar'); // 'bar', 'line', 'area', 'pie'
+      const [customStartDate, setCustomStartDate] = useState('');
+      const [customEndDate, setCustomEndDate] = useState('');
 
       // Filtros de gráfica de cantidades
       const [chartFilterModelo, setChartFilterModelo] = useState('');
@@ -1011,12 +1017,13 @@
           // Preparar los objetos finales
           const itemsToProcess = batchItems.map(item => ({
             ...item,
-            id: Date.now() + Math.random(), // ID final único
+            id: Date.now() + Math.random(),
+            fechaEtiqueta: item.fechaEtiqueta, // ✅ AGREGADO - ya viene en item
             fechaRegistro: timestamp,
             requestDate: dateDisplay,
             requestedBy: currentUser.name,
             requestedByEmail: currentUser.email,
-            status: currentUser.role === 'admin' ? 'approved' : 'pending', // Si es admin entra directo, si no, pendiente
+            status: currentUser.role === 'admin' ? 'approved' : 'pending',
             creadoPor: currentUser.name
           }));
 
@@ -1074,10 +1081,10 @@
             comentario: formData.comentario,
             stockMinimo: stockMin,
             stockMaximo: stockMax,
+            fechaEtiqueta: formData.fechaEtiqueta, // ✅ AGREGADO
             fechaRegistro: new Date().toISOString(),
             creadoPor: currentUser.name
           };
-
           const updatedInventory = [...inventory, newItem];
           setInventory(updatedInventory);
           saveToStorage('inventory-data', updatedInventory);
@@ -1102,6 +1109,7 @@
           cantidad: parseInt(formData.cantidad),
           stockMinimo: stockMin,
           stockMaximo: stockMax,
+          fechaEtiqueta: formData.fechaEtiqueta, // ✅ AGREGADO
           requestedBy: currentUser.name,
           requestedByEmail: currentUser.email,
           requestDate: new Date().toLocaleString('es-MX'),
@@ -1274,6 +1282,7 @@
               comentario: material.comentario,
               stockMinimo: material.stockMinimo || 10,
               stockMaximo: material.stockMaximo || 100,
+              fechaEtiqueta: material.fechaEtiqueta, // ✅ AGREGADO
               fechaRegistro: new Date().toISOString(),
               creadoPor: material.requestedBy
             };
@@ -1328,14 +1337,14 @@
           alert('❌ Solicitud rechazada');
         }
       };
-
-      const handleEdit = (item) => {
-        setEditingItem(item);
-        setFormData({
-          ...item,
-          stockMaximo: item.stockMaximo || 100
-        });
-      };
+          const handleEdit = (item) => {
+            setEditingItem(item);
+            setFormData({
+              ...item,
+              stockMaximo: item.stockMaximo || 100,
+              fechaEtiqueta: item.fechaEtiqueta || new Date().toISOString().split('T')[0] // ✅ AGREGADO
+            });
+          };
 
       const handleUpdateMaterial = (e) => {
         e.preventDefault();
@@ -1345,14 +1354,16 @@
           return;
         }
 
-        const updatedInventory = inventory.map(item =>
-          item.id === editingItem.id ? {
-            ...formData,
-            id: item.id,
-            stockMinimo: currentUser.role === 'admin' ? parseInt(formData.stockMinimo) || 10 : item.stockMinimo,
-            stockMaximo: currentUser.role === 'admin' ? parseInt(formData.stockMaximo) || 100 : item.stockMaximo
-          } : item
-        );
+          const updatedInventory = inventory.map(item =>
+            item.id === editingItem.id ? {
+              ...formData,
+              id: item.id,
+              stockMinimo: currentUser.role === 'admin' ? parseInt(formData.stockMinimo) || 10 : item.stockMinimo,
+              stockMaximo: currentUser.role === 'admin' ? parseInt(formData.stockMaximo) || 100 : item.stockMaximo,
+              fechaEtiqueta: formData.fechaEtiqueta, // ✅ AGREGADO
+              fechaRegistro: item.fechaRegistro // ✅ Mantener la fecha original de registro
+            } : item
+          );
         setInventory(updatedInventory);
         saveToStorage('inventory-data', updatedInventory);
 
@@ -1453,7 +1464,7 @@
         }
 
         const wsData = [
-          ['Modelo', 'Equipo', 'Cantidad', 'Stock Mínimo', 'Stock Máximo', 'Ubicación', 'Op. Actual', 'Próxima Op.', 'Comentario', 'Fecha', 'Creado Por'],
+          ['Modelo', 'Equipo', 'Cantidad', 'Stock Mínimo', 'Stock Máximo', 'Ubicación', 'Op. Actual', 'Próxima Op.', 'Comentario', 'Fecha Etiqueta', 'Fecha Registro', 'Creado Por'],
           ...inventory.map(item => [
             item.modelo,
             item.equipo || '-',
@@ -1464,7 +1475,8 @@
             item.operacionActual || '-',
             item.proximaOperacion || '-',
             item.comentario || '-',
-            item.fechaRegistro || '-',
+            item.fechaEtiqueta || '-', // ✅ AGREGADO
+            item.fechaRegistro ? new Date(item.fechaRegistro).toLocaleDateString('es-MX') : '-',
             item.creadoPor || '-'
           ])
         ];
@@ -1681,143 +1693,200 @@
         });
       };
 
-      // Obtener cantidades de modelos por semana
-      const getModelQuantitiesByWeek = () => {
-        const weeksMap = {};
+      // Obtener cantidades de modelos por período dinámico
+const getModelQuantitiesByPeriod = () => {
+  const periodsMap = {};
+  
+  inventory.forEach(item => {
+    // Determinar qué fecha usar
+    let dateToUse;
+    
+    if (dateFieldType === 'etiqueta' && item.fechaEtiqueta) {
+      dateToUse = new Date(item.fechaEtiqueta);
+    } else if (dateFieldType === 'registro' && item.fechaRegistro) {
+      dateToUse = new Date(item.fechaRegistro);
+    } else {
+      // Fallback: buscar en historial
+      const addEntry = changeHistory.find(entry =>
+        entry.action.includes('agregó') &&
+        entry.details.toLowerCase().includes(item.modelo.toLowerCase()) &&
+        entry.details.toLowerCase().includes(item.ubicacion.toLowerCase())
+      );
+      dateToUse = addEntry && addEntry.date ? new Date(addEntry.date) : new Date();
+    }
+    
+    // Filtro de rango personalizado
+    if (customStartDate && dateToUse < new Date(customStartDate)) return;
+    if (customEndDate && dateToUse > new Date(customEndDate + 'T23:59:59')) return;
+    
+    // Generar clave según el tipo de período
+    let key, display;
+    
+    switch(dateRangeType) {
+      case 'day':
+        key = dateToUse.toISOString().split('T')[0];
+        display = new Date(key).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+        break;
+      case 'week':
+        const week = getWeekNumber(dateToUse);
+        const year = dateToUse.getFullYear();
+        key = `${year}-W${week}`;
+        display = `Semana ${week} - ${year}`;
+        break;
+      case 'month':
+        key = `${dateToUse.getFullYear()}-${String(dateToUse.getMonth() + 1).padStart(2, '0')}`;
+        display = dateToUse.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+        break;
+      case 'year':
+        key = String(dateToUse.getFullYear());
+        display = `Año ${key}`;
+        break;
+      default:
+        key = dateToUse.toISOString().split('T')[0];
+        display = key;
+    }
+    
+    if (!periodsMap[key]) {
+      periodsMap[key] = {
+        key,
+        display,
+        date: dateToUse,
+        models: {},
+        byOperation: {},
+        byLocation: {},
+        byEquipo: {},
+        totalQuantity: 0,
+        itemCount: 0
+      };
+    }
+    
+    // Acumular por modelo
+    if (!periodsMap[key].models[item.modelo]) {
+      periodsMap[key].models[item.modelo] = 0;
+    }
+    periodsMap[key].models[item.modelo] += parseInt(item.cantidad) || 0;
+    
+    // Acumular por operación
+    if (item.operacionActual) {
+      if (!periodsMap[key].byOperation[item.operacionActual]) {
+        periodsMap[key].byOperation[item.operacionActual] = 0;
+      }
+      periodsMap[key].byOperation[item.operacionActual] += parseInt(item.cantidad) || 0;
+    }
+    
+    // Acumular por ubicación
+    if (!periodsMap[key].byLocation[item.ubicacion]) {
+      periodsMap[key].byLocation[item.ubicacion] = 0;
+    }
+    periodsMap[key].byLocation[item.ubicacion] += parseInt(item.cantidad) || 0;
+    
+    // Acumular por equipo
+    if (item.equipo) {
+      if (!periodsMap[key].byEquipo[item.equipo]) {
+        periodsMap[key].byEquipo[item.equipo] = 0;
+      }
+      periodsMap[key].byEquipo[item.equipo] += parseInt(item.cantidad) || 0;
+    }
+    
+    periodsMap[key].totalQuantity += parseInt(item.cantidad) || 0;
+    periodsMap[key].itemCount++;
+  });
+  
+  // Ordenar por fecha más reciente
+  return Object.values(periodsMap).sort((a, b) => b.date - a.date);
+};
 
-        // Iterar sobre el inventario actual
-        inventory.forEach(item => {
-          // Buscar cuándo fue agregado
-          const addEntry = changeHistory.find(entry =>
-            entry.action.includes('agregó') &&
-            entry.details.toLowerCase().includes(item.modelo.toLowerCase()) &&
-            entry.details.toLowerCase().includes(item.ubicacion.toLowerCase())
-          );
+      const filterChartData = (periods) => {
+  if (!chartFilterModelo && !chartFilterOperacion && !chartFilterUbicacion) {
+    return periods;
+  }
 
-          if (addEntry && addEntry.date) {
-            const date = new Date(addEntry.date);
-            const week = getWeekNumber(date);
-            const year = date.getFullYear();
-            const key = `${year}-W${week}`;
+  return periods.map(period => {
+    let filteredTotalQuantity = 0;
+    const filteredModels = {};
+    const filteredByOperation = {};
+    const filteredByLocation = {};
 
-            if (!weeksMap[key]) {
-              weeksMap[key] = {
-                week,
-                year,
-                key,
-                display: `Semana ${week} - ${year}`,
-                models: {},
-                byOperation: {},
-                byNextOperation: {},
-                totalQuantity: 0
-              };
-            }
+    // Filtrar inventario de este período
+    inventory.forEach(item => {
+      // Determinar fecha a usar
+      let dateToUse;
+      if (dateFieldType === 'etiqueta' && item.fechaEtiqueta) {
+        dateToUse = new Date(item.fechaEtiqueta);
+      } else if (dateFieldType === 'registro' && item.fechaRegistro) {
+        dateToUse = new Date(item.fechaRegistro);
+      } else {
+        const addEntry = changeHistory.find(entry =>
+          entry.action.includes('agregó') &&
+          entry.details.toLowerCase().includes(item.modelo.toLowerCase()) &&
+          entry.details.toLowerCase().includes(item.ubicacion.toLowerCase())
+        );
+        dateToUse = addEntry && addEntry.date ? new Date(addEntry.date) : new Date();
+      }
 
-            // Acumular por modelo
-            if (!weeksMap[key].models[item.modelo]) {
-              weeksMap[key].models[item.modelo] = 0;
-            }
-            weeksMap[key].models[item.modelo] += parseInt(item.cantidad) || 0;
+      // Verificar si pertenece a este período
+      let belongsToPeriod = false;
+      switch(dateRangeType) {
+        case 'day':
+          belongsToPeriod = dateToUse.toISOString().split('T')[0] === period.key;
+          break;
+        case 'week':
+          const week = getWeekNumber(dateToUse);
+          const year = dateToUse.getFullYear();
+          belongsToPeriod = `${year}-W${week}` === period.key;
+          break;
+        case 'month':
+          belongsToPeriod = `${dateToUse.getFullYear()}-${String(dateToUse.getMonth() + 1).padStart(2, '0')}` === period.key;
+          break;
+        case 'year':
+          belongsToPeriod = String(dateToUse.getFullYear()) === period.key;
+          break;
+      }
 
-            // Acumular por operación actual
-            if (item.operacionActual) {
-              if (!weeksMap[key].byOperation[item.operacionActual]) {
-                weeksMap[key].byOperation[item.operacionActual] = 0;
-              }
-              weeksMap[key].byOperation[item.operacionActual] += parseInt(item.cantidad) || 0;
-            }
+      if (belongsToPeriod) {
+        const matchModelo = !chartFilterModelo ||
+          item.modelo.toLowerCase().includes(chartFilterModelo.toLowerCase());
 
-            // Acumular por próxima operación
-            if (item.proximaOperacion) {
-              if (!weeksMap[key].byNextOperation[item.proximaOperacion]) {
-                weeksMap[key].byNextOperation[item.proximaOperacion] = 0;
-              }
-              weeksMap[key].byNextOperation[item.proximaOperacion] += parseInt(item.cantidad) || 0;
-            }
+        const matchOperacion = !chartFilterOperacion ||
+          (item.operacionActual && item.operacionActual.toLowerCase().includes(chartFilterOperacion.toLowerCase()));
 
-            weeksMap[key].totalQuantity += parseInt(item.cantidad) || 0;
+        const matchUbicacion = !chartFilterUbicacion ||
+          item.ubicacion.toLowerCase().includes(chartFilterUbicacion.toLowerCase());
+
+        if (matchModelo && matchOperacion && matchUbicacion) {
+          const qty = parseInt(item.cantidad) || 0;
+
+          if (!filteredModels[item.modelo]) {
+            filteredModels[item.modelo] = 0;
           }
-        });
+          filteredModels[item.modelo] += qty;
 
-        // Ordenar por semana más reciente
-        return Object.values(weeksMap).sort((a, b) => {
-          if (a.year !== b.year) return b.year - a.year;
-          return b.week - a.week;
-        });
-      };
-
-      // Filtrar datos de gráfica
-      const filterChartData = (weeks) => {
-        if (!chartFilterModelo && !chartFilterOperacion && !chartFilterUbicacion) {
-          return weeks;
-        }
-
-        return weeks.map(week => {
-          let filteredTotalQuantity = 0;
-          const filteredModels = {};
-          const filteredByOperation = {};
-          const filteredByNextOperation = {};
-
-          // Filtrar inventario de esta semana
-          inventory.forEach(item => {
-            const addEntry = changeHistory.find(entry =>
-              entry.action.includes('agregó') &&
-              entry.details.toLowerCase().includes(item.modelo.toLowerCase()) &&
-              entry.details.toLowerCase().includes(item.ubicacion.toLowerCase())
-            );
-
-            if (addEntry && addEntry.date) {
-              const date = new Date(addEntry.date);
-              const itemWeek = getWeekNumber(date);
-              const itemYear = date.getFullYear();
-
-              if (itemWeek === week.week && itemYear === week.year) {
-                const matchModelo = !chartFilterModelo ||
-                  item.modelo.toLowerCase().includes(chartFilterModelo.toLowerCase());
-
-                const matchOperacion = !chartFilterOperacion ||
-                  (item.operacionActual && item.operacionActual.toLowerCase().includes(chartFilterOperacion.toLowerCase()));
-
-                const matchUbicacion = !chartFilterUbicacion ||
-                  item.ubicacion.toLowerCase().includes(chartFilterUbicacion.toLowerCase());
-
-                if (matchModelo && matchOperacion && matchUbicacion) {
-                  const qty = parseInt(item.cantidad) || 0;
-
-                  if (!filteredModels[item.modelo]) {
-                    filteredModels[item.modelo] = 0;
-                  }
-                  filteredModels[item.modelo] += qty;
-
-                  if (item.operacionActual) {
-                    if (!filteredByOperation[item.operacionActual]) {
-                      filteredByOperation[item.operacionActual] = 0;
-                    }
-                    filteredByOperation[item.operacionActual] += qty;
-                  }
-
-                  if (item.proximaOperacion) {
-                    if (!filteredByNextOperation[item.proximaOperacion]) {
-                      filteredByNextOperation[item.proximaOperacion] = 0;
-                    }
-                    filteredByNextOperation[item.proximaOperacion] += qty;
-                  }
-
-                  filteredTotalQuantity += qty;
-                }
-              }
+          if (item.operacionActual) {
+            if (!filteredByOperation[item.operacionActual]) {
+              filteredByOperation[item.operacionActual] = 0;
             }
-          });
+            filteredByOperation[item.operacionActual] += qty;
+          }
 
-          return {
-            ...week,
-            models: filteredModels,
-            byOperation: filteredByOperation,
-            byNextOperation: filteredByNextOperation,
-            totalQuantity: filteredTotalQuantity
-          };
-        });
-      };
+          if (!filteredByLocation[item.ubicacion]) {
+            filteredByLocation[item.ubicacion] = 0;
+          }
+          filteredByLocation[item.ubicacion] += qty;
+
+          filteredTotalQuantity += qty;
+        }
+      }
+    });
+
+    return {
+      ...period,
+      models: filteredModels,
+      byOperation: filteredByOperation,
+      byLocation: filteredByLocation,
+      totalQuantity: filteredTotalQuantity
+    };
+  });
+};
 
       // Obtener estadísticas de semana específica
       const getWeekStats = (weekKey) => {
@@ -2934,305 +3003,289 @@
               </div>
             )}
 
-            {/* ESTADÍSTICAS SEMANALES */}
-            {currentUser?.role === 'admin' && showWeeklyStats && (
-              <div className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl rounded-xl p-6 border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                    <Calendar /> Estadísticas Semanales
-                  </h2>
-                  <button onClick={() => setShowWeeklyStats(false)}
-                    className="text-slate-400 hover:text-white">
-                    <XCircle />
-                  </button>
-                </div>
+            {/* ESTADÍSTICAS TEMPORALES AVANZADAS */}
+{currentUser?.role === 'admin' && showWeeklyStats && (
+  <div className={`${darkMode ? 'bg-slate-900/70' : 'bg-slate-800/50'} backdrop-blur-xl rounded-xl p-6 border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+    <div className="flex items-center justify-between mb-6">
+      <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+        <Calendar /> Análisis Temporal Avanzado
+      </h2>
+      <button onClick={() => setShowWeeklyStats(false)}
+        className="text-slate-400 hover:text-white">
+        <XCircle />
+      </button>
+    </div>
 
-                {/* FILTROS */}
-                <div className="mb-6 p-4 bg-slate-900/30 rounded-lg border border-slate-700">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Filter className="text-blue-400" />
-                    <h3 className="text-white font-semibold">Filtros</h3>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <input
-                      type="text"
-                      value={weekFilterModelo}
-                      onChange={(e) => setWeekFilterModelo(e.target.value)}
-                      placeholder="Modelo..."
-                      className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
-                    />
-                    <input
-                      type="text"
-                      value={weekFilterUbicacion}
-                      onChange={(e) => setWeekFilterUbicacion(e.target.value)}
-                      placeholder="Ubicación..."
-                      className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
-                    />
-                    <input
-                      type="text"
-                      value={weekFilterOperacion}
-                      onChange={(e) => setWeekFilterOperacion(e.target.value)}
-                      placeholder="Operación..."
-                      className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
-                    />
-                    <input
-                      type="text"
-                      value={weekFilterEquipo}
-                      onChange={(e) => setWeekFilterEquipo(e.target.value)}
-                      placeholder="Equipo..."
-                      className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
-                    />
-                  </div>
-                  {(weekFilterModelo || weekFilterUbicacion || weekFilterOperacion || weekFilterEquipo) && (
-                    <button
-                      onClick={() => {
-                        setWeekFilterModelo('');
-                        setWeekFilterUbicacion('');
-                        setWeekFilterOperacion('');
-                        setWeekFilterEquipo('');
-                      }}
-                      className="mt-3 text-xs text-blue-400 hover:text-blue-300">
-                      Limpiar filtros
-                    </button>
-                  )}
-                </div>
+    {/* PANEL DE CONTROL */}
+    <div className="mb-6 p-6 bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-xl border-2 border-blue-500/50">
+      <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+        <Settings /> Panel de Control
+      </h3>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Período */}
+        <div>
+          <label className="block text-xs text-blue-300 mb-2 font-semibold">📅 Agrupar Por</label>
+          <select
+            value={dateRangeType}
+            onChange={(e) => setDateRangeType(e.target.value)}
+            className="w-full px-3 py-2 bg-slate-900/70 border border-blue-500 rounded-lg text-white font-semibold">
+            <option value="day">🌞 Día</option>
+            <option value="week">📆 Semana</option>
+            <option value="month">🗓️ Mes</option>
+            <option value="year">📊 Año</option>
+          </select>
+        </div>
 
-                {/* SEMANA ACTUAL */}
-                <div className="mb-8 p-6 bg-gradient-to-r from-blue-600/20 to-purple-600/20 border-2 border-blue-500 rounded-xl">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="text-2xl font-bold text-white">📅 {getCurrentWeek().display}</h3>
-                      <p className="text-blue-300 text-sm">Semana actual en curso</p>
-                    </div>
-                    <div className="text-right">
-                      {(() => {
-                        const currentWeekData = getAllWeeks()[0];
-                        const filtered = currentWeekData ? filterWeekEntries(currentWeekData.entries) : [];
-                        return filtered.length > 0 ? (
-                          <>
-                            <p className="text-4xl font-bold text-white">{filtered.length}</p>
-                            <p className="text-blue-300 text-sm">Operaciones{(weekFilterModelo || weekFilterUbicacion || weekFilterOperacion || weekFilterEquipo) ? ' (filtradas)' : ''}</p>
-                          </>
-                        ) : (
-                          <p className="text-slate-400">Sin datos</p>
-                        );
-                      })()}
-                    </div>
-                  </div>
+        {/* Tipo de Fecha */}
+        <div>
+          <label className="block text-xs text-green-300 mb-2 font-semibold">🏷️ Fecha de Referencia</label>
+          <select
+            value={dateFieldType}
+            onChange={(e) => setDateFieldType(e.target.value)}
+            className="w-full px-3 py-2 bg-slate-900/70 border border-green-500 rounded-lg text-white font-semibold">
+            <option value="registro">📥 Fecha Registro</option>
+            <option value="etiqueta">🏷️ Fecha Etiqueta</option>
+          </select>
+        </div>
 
-                  {(() => {
-                    const currentWeekData = getAllWeeks()[0];
-                    return currentWeekData ? (
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="bg-green-600/20 border border-green-500 rounded-lg p-4 text-center">
-                          <p className="text-3xl font-bold text-green-400">{currentWeekData.stats.entriesCount}</p>
-                          <p className="text-green-300 text-sm">Entradas</p>
-                          <p className="text-green-200 text-xs mt-1">{currentWeekData.stats.quantitiesAdded} unidades</p>
-                        </div>
-                        <div className="bg-red-600/20 border border-red-500 rounded-lg p-4 text-center">
-                          <p className="text-3xl font-bold text-red-400">{currentWeekData.stats.exitsCount}</p>
-                          <p className="text-red-300 text-sm">Salidas</p>
-                          <p className="text-red-200 text-xs mt-1">{currentWeekData.stats.quantitiesRemoved} unidades</p>
-                        </div>
-                        <div className="bg-blue-600/20 border border-blue-500 rounded-lg p-4 text-center">
-                          <p className="text-3xl font-bold text-blue-400">{currentWeekData.stats.editsCount}</p>
-                          <p className="text-blue-300 text-sm">Ediciones</p>
-                          <p className="text-blue-200 text-xs mt-1">{currentWeekData.stats.quantitiesEdited} unidades</p>
-                        </div>
+        {/* Gráfica */}
+        <div>
+          <label className="block text-xs text-purple-300 mb-2 font-semibold">📈 Tipo Gráfica</label>
+          <select
+            value={chartViewType}
+            onChange={(e) => setChartViewType(e.target.value)}
+            className="w-full px-3 py-2 bg-slate-900/70 border border-purple-500 rounded-lg text-white font-semibold">
+            <option value="bar">📊 Barras</option>
+            <option value="line">📈 Líneas</option>
+            <option value="area">🏔️ Áreas</option>
+            <option value="table">📋 Tabla</option>
+          </select>
+        </div>
+
+        {/* Reset */}
+        <div className="flex items-end">
+          <button
+            onClick={() => {
+              setDateRangeType('week');
+              setDateFieldType('registro');
+              setChartViewType('bar');
+              setCustomStartDate('');
+              setCustomEndDate('');
+              setChartFilterModelo('');
+              setChartFilterOperacion('');
+              setChartFilterUbicacion('');
+            }}
+            className="w-full bg-red-600 hover:bg-red-500 text-white px-3 py-2 rounded-lg font-semibold">
+            🔄 Reset
+          </button>
+        </div>
+      </div>
+
+      {/* Rango Personalizado */}
+      <div className="mt-4 pt-4 border-t border-slate-700">
+        <label className="block text-xs text-yellow-300 mb-2 font-semibold">📍 Rango Personalizado</label>
+        <div className="grid grid-cols-2 gap-4">
+          <input
+            type="date"
+            value={customStartDate}
+            onChange={(e) => setCustomStartDate(e.target.value)}
+            className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+            placeholder="Desde"
+          />
+          <input
+            type="date"
+            value={customEndDate}
+            onChange={(e) => setCustomEndDate(e.target.value)}
+            className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+            placeholder="Hasta"
+          />
+        </div>
+      </div>
+
+      {/* Indicadores */}
+      <div className="mt-4 flex flex-wrap gap-2 text-xs">
+        <span className="bg-blue-500/20 px-3 py-1 rounded-full text-blue-300">
+          {dateRangeType === 'day' ? '🌞 Diario' : dateRangeType === 'week' ? '📆 Semanal' : dateRangeType === 'month' ? '🗓️ Mensual' : '📊 Anual'}
+        </span>
+        <span className="bg-green-500/20 px-3 py-1 rounded-full text-green-300">
+          {dateFieldType === 'registro' ? '📥 Registro' : '🏷️ Etiqueta'}
+        </span>
+        <span className="bg-purple-500/20 px-3 py-1 rounded-full text-purple-300">
+          {chartViewType === 'bar' ? '📊 Barras' : chartViewType === 'line' ? '📈 Líneas' : chartViewType === 'area' ? '🏔️ Área' : '📋 Tabla'}
+        </span>
+      </div>
+    </div>
+
+    {/* FILTROS */}
+    <div className="mb-6 p-4 bg-slate-900/30 rounded-lg border border-slate-700">
+      <div className="flex items-center gap-2 mb-3">
+        <Filter className="text-blue-400" />
+        <h4 className="text-white font-semibold text-sm">Filtros de Datos</h4>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <input
+          type="text"
+          value={chartFilterModelo}
+          onChange={(e) => setChartFilterModelo(e.target.value)}
+          placeholder="🏷️ Modelo..."
+          className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+        />
+        <input
+          type="text"
+          value={chartFilterOperacion}
+          onChange={(e) => setChartFilterOperacion(e.target.value)}
+          placeholder="⚙️ Operación..."
+          className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+        />
+        <input
+          type="text"
+          value={chartFilterUbicacion}
+          onChange={(e) => setChartFilterUbicacion(e.target.value)}
+          placeholder="📍 Ubicación..."
+          className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+        />
+      </div>
+    </div>
+
+    {/* GRÁFICA PRINCIPAL */}
+    <div className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-6 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+      <h3 className="text-xl font-bold text-white mb-4">📊 Visualización de Datos</h3>
+      
+      {(() => {
+        const rawData = getModelQuantitiesByPeriod();
+        const data = filterChartData(rawData);
+        
+        if (data.length === 0) {
+          return (
+            <div className="text-center py-12">
+              <Package className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+              <p className="text-slate-400">No hay datos con estos filtros</p>
+            </div>
+          );
+        }
+
+        const maxValue = Math.max(...data.map(p => p.totalQuantity), 1);
+
+        // GRÁFICA DE BARRAS
+        if (chartViewType === 'bar') {
+          return (
+            <div>
+              <div className="relative h-80 flex items-end justify-between gap-1">
+                {data.slice(0, 20).reverse().map((period, i) => {
+                  const height = (period.totalQuantity / maxValue) * 100;
+                  const isRecent = i >= data.slice(0, 20).length - 3;
+                  
+                  return (
+                    <div key={period.key} className="flex-1 flex flex-col items-center justify-end h-full group">
+                      <div className="text-center mb-1 opacity-0 group-hover:opacity-100 transition">
+                        <p className="text-xs font-bold text-white bg-slate-900 px-2 py-1 rounded">{period.totalQuantity}</p>
                       </div>
-                    ) : null;
-                  })()}
-                </div>
-
-                {/* GRÁFICA DE CANTIDADES POR SEMANA */}
-                <div className="mb-8">
-                  <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                    <LineChart /> Cantidades de Modelos por Semana
-                  </h3>
-
-                  {/* FILTROS DE GRÁFICA */}
-                  <div className="mb-4 p-4 bg-slate-900/30 rounded-lg border border-slate-700">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Filter className="text-blue-400" />
-                      <h4 className="text-white font-semibold text-sm">Filtros de Gráfica</h4>
+                      <div
+                        className={`w-full rounded-t transition-all duration-300 ${isRecent ? 'bg-green-500' : 'bg-blue-500'} hover:opacity-80`}
+                        style={{ height: `${height}%` }}
+                        title={`${period.display}: ${period.totalQuantity}`}
+                      ></div>
+                      <p className="text-xs text-slate-400 mt-1 truncate max-w-full">{period.display.slice(0, 10)}</p>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <input
-                        type="text"
-                        value={chartFilterModelo}
-                        onChange={(e) => setChartFilterModelo(e.target.value)}
-                        placeholder="Modelo..."
-                        className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
-                      />
-                      <input
-                        type="text"
-                        value={chartFilterOperacion}
-                        onChange={(e) => setChartFilterOperacion(e.target.value)}
-                        placeholder="Operación Actual..."
-                        className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
-                      />
-                      <input
-                        type="text"
-                        value={chartFilterUbicacion}
-                        onChange={(e) => setChartFilterUbicacion(e.target.value)}
-                        placeholder="Ubicación..."
-                        className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
-                      />
-                    </div>
-                    {(chartFilterModelo || chartFilterOperacion || chartFilterUbicacion) && (
-                      <button
-                        onClick={() => {
-                          setChartFilterModelo('');
-                          setChartFilterOperacion('');
-                          setChartFilterUbicacion('');
-                        }}
-                        className="mt-3 text-xs text-blue-400 hover:text-blue-300">
-                        Limpiar filtros
-                      </button>
-                    )}
-                  </div>
-
-                  <div className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-6 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
-                    {(() => {
-                      const rawData = getModelQuantitiesByWeek();
-                      const data = filterChartData(rawData);
-                      const maxValue = Math.max(...data.map(w => w.totalQuantity), 1);
-
-                      return data.length > 0 ? (
-                        <div className="space-y-4">
-                          {/* Gráfica de barras */}
-                          <div className="relative h-64 flex items-end justify-between gap-2">
-                            {data.map((week, i) => {
-                              const height = (week.totalQuantity / maxValue) * 100;
-                              const color = i === 0 ? 'bg-green-500' : 'bg-blue-500';
-
-                              return (
-                                <div key={week.key} className="flex-1 flex flex-col items-center justify-end h-full">
-                                  <div className="text-center mb-2">
-                                    <p className="text-xs font-bold text-white">{week.totalQuantity}</p>
-                                  </div>
-                                  <div
-                                    className={`w-full ${color} rounded-t transition-all duration-500 hover:bg-green-400`}
-                                    style={{ height: `${height}%` }}
-                                    title={`${week.display}: ${week.totalQuantity} unidades`}
-                                  ></div>
-                                  <div className="mt-2">
-                                    <p className="text-xs text-slate-400 transform -rotate-45 whitespace-nowrap">S{week.week}</p>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-
-                          {/* Resumen */}
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-slate-700">
-                            <div className="text-center">
-                              <p className="text-2xl font-bold text-white">{data.length}</p>
-                              <p className="text-sm text-slate-400">Semanas</p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-2xl font-bold text-green-400">
-                                {data.reduce((sum, w) => sum + w.totalQuantity, 0)}
-                              </p>
-                              <p className="text-sm text-slate-400">Total unidades</p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-2xl font-bold text-blue-400">
-                                {data.length > 0 ? Math.round(data.reduce((sum, w) => sum + w.totalQuantity, 0) / data.length) : 0}
-                              </p>
-                              <p className="text-sm text-slate-400">Promedio/semana</p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-2xl font-bold text-purple-400">
-                                {Object.keys(data.length > 0 ? data[0].models : {}).length}
-                              </p>
-                              <p className="text-sm text-slate-400">Modelos distintos</p>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-center py-12">
-                          <LineChart className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                          <p className="text-slate-400">No hay datos de cantidades disponibles</p>
-                        </div>
-                      );
-                    })()}
-                  </div>
+                  );
+                })}
+              </div>
+              
+              {/* Estadísticas */}
+              <div className="grid grid-cols-4 gap-4 mt-6 pt-4 border-t border-slate-700">
+                <div className="text-center bg-blue-900/20 p-3 rounded">
+                  <p className="text-2xl font-bold text-white">{data.length}</p>
+                  <p className="text-xs text-slate-400">Períodos</p>
                 </div>
-
-                {/* DISTRIBUCIÓN POR MODELOS */}
-                <div className="mb-8">
-                  <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                    <BarChart2 /> Cantidades por Modelo
-                  </h3>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {(() => {
-                      const rawData = getModelQuantitiesByWeek();
-                      const data = filterChartData(rawData);
-
-                      return data.slice(0, 6).map((week, index) => (
-                        <div key={week.key} className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-4 rounded-lg border ${index === 0 ? 'border-green-500 bg-green-900/20' : 'border-slate-700'
-                          }`}>
-                          <div className="flex items-center justify-between mb-3">
-                            <div>
-                              <h4 className="text-white font-bold">{week.display}</h4>
-                              {index === 0 && <p className="text-green-400 text-xs">Actual</p>}
-                            </div>
-                            <div className="text-right">
-                              <p className="text-2xl font-bold text-white">{week.totalQuantity}</p>
-                              <p className="text-slate-400 text-xs">unidades totales</p>
-                            </div>
-                          </div>
-
-                          {/* Top Modelos por Cantidad */}
-                          <div className="mb-3">
-                            <p className="text-xs text-blue-400 font-semibold mb-2">Modelos con más cantidad:</p>
-                            <div className="space-y-1">
-                              {Object.entries(week.models)
-                                .sort((a, b) => b[1] - a[1])
-                                .slice(0, 8)
-                                .map(([modelo, qty], i) => (
-                                  <div key={i} className="flex items-center justify-between text-xs">
-                                    <span className="text-slate-300 truncate">{modelo}</span>
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-16 bg-slate-700 rounded-full h-2 overflow-hidden">
-                                        <div
-                                          className="bg-green-500 h-full"
-                                          style={{ width: `${(qty / week.totalQuantity) * 100}%` }}
-                                        ></div>
-                                      </div>
-                                      <span className="text-green-400 font-bold w-12 text-right">{qty}u</span>
-                                    </div>
-                                  </div>
-                                ))}
-                              {Object.keys(week.models).length === 0 && (
-                                <p className="text-xs text-slate-500">Sin datos</p>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Estadísticas */}
-                          <div className="pt-3 border-t border-slate-700 grid grid-cols-2 gap-2 text-xs">
-                            <div className="text-center bg-slate-800/50 rounded p-2">
-                              <p className="text-slate-400">Modelos distintos</p>
-                              <p className="text-white font-bold text-lg">{Object.keys(week.models).length}</p>
-                            </div>
-                            <div className="text-center bg-slate-800/50 rounded p-2">
-                              <p className="text-slate-400">Promedio/modelo</p>
-                              <p className="text-white font-bold text-lg">
-                                {Object.keys(week.models).length > 0
-                                  ? Math.round(week.totalQuantity / Object.keys(week.models).length)
-                                  : 0}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ));
-                    })()}
-                  </div>
+                <div className="text-center bg-green-900/20 p-3 rounded">
+                  <p className="text-2xl font-bold text-green-400">{data.reduce((s, p) => s + p.totalQuantity, 0).toLocaleString()}</p>
+                  <p className="text-xs text-slate-400">Total</p>
+                </div>
+                <div className="text-center bg-purple-900/20 p-3 rounded">
+                  <p className="text-2xl font-bold text-purple-400">{Math.round(data.reduce((s, p) => s + p.totalQuantity, 0) / data.length)}</p>
+                  <p className="text-xs text-slate-400">Promedio</p>
+                </div>
+                <div className="text-center bg-yellow-900/20 p-3 rounded">
+                  <p className="text-2xl font-bold text-yellow-400">{Math.max(...data.map(p => p.totalQuantity))}</p>
+                  <p className="text-xs text-slate-400">Máximo</p>
                 </div>
               </div>
-            )}
+            </div>
+          );
+        }
+
+        // GRÁFICA DE LÍNEAS
+        if (chartViewType === 'line') {
+          return (
+            <div>
+              <svg width="100%" height="300" viewBox="0 0 800 300">
+                {data.slice(0, 15).reverse().map((p, i, arr) => {
+                  const x1 = 50 + (i / (arr.length - 1)) * 700;
+                  const y1 = 250 - (p.totalQuantity / maxValue) * 200;
+                  const x2 = i < arr.length - 1 ? 50 + ((i + 1) / (arr.length - 1)) * 700 : x1;
+                  const y2 = i < arr.length - 1 ? 250 - (arr[i + 1].totalQuantity / maxValue) * 200 : y1;
+                  
+                  return (
+                    <g key={i}>
+                      {i < arr.length - 1 && <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#3b82f6" strokeWidth="2" />}
+                      <circle cx={x1} cy={y1} r="4" fill="#3b82f6" />
+                      <title>{p.display}: {p.totalQuantity}</title>
+                    </g>
+                  );
+                })}
+              </svg>
+              <p className="text-center text-slate-400 mt-4">Total: {data.reduce((s, p) => s + p.totalQuantity, 0)}</p>
+            </div>
+          );
+        }
+
+        // GRÁFICA DE ÁREA
+        if (chartViewType === 'area') {
+          const points = data.slice(0, 15).reverse();
+          const pathData = points.map((p, i) => {
+            const x = 50 + (i / (points.length - 1)) * 700;
+            const y = 250 - (p.totalQuantity / maxValue) * 200;
+            return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
+          }).join(' ');
+          
+          return (
+            <svg width="100%" height="300" viewBox="0 0 800 300">
+              <path d={`${pathData} L 750 250 L 50 250 Z`} fill="rgba(59, 130, 246, 0.3)" />
+              <path d={pathData} fill="none" stroke="#3b82f6" strokeWidth="2" />
+            </svg>
+          );
+        }
+
+        // TABLA
+        return (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-800">
+                <tr>
+                  <th className="p-3 text-left text-slate-300">Período</th>
+                  <th className="p-3 text-right text-slate-300">Cantidad</th>
+                  <th className="p-3 text-right text-slate-300">Items</th>
+                  <th className="p-3 text-right text-slate-300">Modelos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.slice(0, 15).map(p => (
+                  <tr key={p.key} className="border-b border-slate-700">
+                    <td className="p-3 text-white">{p.display}</td>
+                    <td className="p-3 text-right text-green-400 font-bold">{p.totalQuantity}</td>
+                    <td className="p-3 text-right text-slate-400">{p.itemCount}</td>
+                    <td className="p-3 text-right text-blue-400">{Object.keys(p.models).length}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })()}
+    </div>
+  </div>
+)}
 
             {/* HISTORIAL CON FILTROS */}
             {currentUser?.role === 'admin' && showHistory && (
@@ -3477,7 +3530,7 @@
 
                   {/* ✅ NUEVO CAMPO: Fecha Etiqueta */}
                   <div className="lg:col-span-1">
-                    <label className="block text-sm font-medium text-slate-300 mb-2">📅 Fecha Etiqueta *</label>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Fecha Etiqueta *</label>
                     <input
                       type="date"
                       value={formData.fechaEtiqueta}
@@ -3669,6 +3722,7 @@
                       <th className="text-left py-3 px-3 text-slate-300 font-semibold">Ubicaciones</th>
                       <th className="text-left py-3 px-3 text-slate-300 font-semibold">Stock Mín/Máx</th>
                       <th className="text-left py-3 px-3 text-slate-300 font-semibold">Estado</th>
+                      <th className="text-left py-3 px-3 text-slate-300 font-semibold">Fecha Etiqueta</th>
                       <th className="text-left py-3 px-3 text-slate-300 font-semibold">Acciones</th>
                     </tr>
                   </thead>
@@ -3744,8 +3798,11 @@
                                   </div>
                                 </td>
                                 <td className="py-3 px-3 text-slate-400 text-xs italic">{item.equipo || 'Sin equipo'}</td>
-                                <td className="py-3 px-3 text-slate-400 text-xs" colSpan="2">
+                                <td className="py-3 px-3 text-slate-400 text-xs">
                                   {item.operacionActual || 'N/A'} {item.proximaOperacion ? `➡ ${item.proximaOperacion}` : ''}
+                                </td>
+                                <td className="py-3 px-3 text-blue-300 text-xs font-mono">
+                                  {item.fechaEtiqueta || 'Sin fecha'}
                                 </td>
                                 <td className="py-3 px-3">
                                   <div className="flex gap-2">
