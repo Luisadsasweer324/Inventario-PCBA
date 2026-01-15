@@ -751,7 +751,6 @@
         const [darkMode, setDarkMode] = useState(false);
         const [connectionStatus, setConnectionStatus] = useState(
           firebaseInitialized ? "connected" : "local"
-          
         );
 
         // Filtros de historial
@@ -782,6 +781,16 @@
         const [chartFilterModelo, setChartFilterModelo] = useState("");
         const [chartFilterOperacion, setChartFilterOperacion] = useState("");
         const [chartFilterUbicacion, setChartFilterUbicacion] = useState("");
+        // Estados para filtros y ordenamiento de inventario
+        const [inventoryFilterModelo, setInventoryFilterModelo] = useState("");
+        const [inventoryFilterUbicacion, setInventoryFilterUbicacion] =
+          useState("");
+        const [inventoryFilterOperacion, setInventoryFilterOperacion] =
+          useState("");
+        const [inventoryFilterEquipo, setInventoryFilterEquipo] = useState("");
+        const [inventoryFilterEstado, setInventoryFilterEstado] = useState(""); // 'todos', 'bajo', 'critico', 'alto', 'ok'
+        const [inventorySortBy, setInventorySortBy] = useState("modelo"); // 'modelo', 'cantidad', 'ubicaciones', 'estado'
+        const [inventorySortOrder, setInventorySortOrder] = useState("asc"); // 'asc', 'desc'
 
         const [formData, setFormData] = useState({
           modelo: "",
@@ -2137,13 +2146,132 @@
           e.target.value = "";
         };
 
-        const filteredInventory = inventory.filter(
-          (item) =>
-            item.modelo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.ubicacion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (item.equipo &&
-              item.equipo.toLowerCase().includes(searchTerm.toLowerCase()))
-        );
+// Filtrado y ordenamiento avanzado del inventario
+const getFilteredAndSortedInventory = () => {
+  // Primero aplicar búsqueda general
+  let filtered = inventory.filter(
+    (item) =>
+      item.modelo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.ubicacion.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.equipo &&
+        item.equipo.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  // Aplicar filtros específicos
+  if (inventoryFilterModelo) {
+    filtered = filtered.filter((item) =>
+      item.modelo.toLowerCase().includes(inventoryFilterModelo.toLowerCase())
+    );
+  }
+
+  if (inventoryFilterUbicacion) {
+    filtered = filtered.filter((item) =>
+      item.ubicacion.toLowerCase().includes(inventoryFilterUbicacion.toLowerCase())
+    );
+  }
+
+  if (inventoryFilterOperacion) {
+    filtered = filtered.filter((item) =>
+      item.operacionActual &&
+      item.operacionActual.toLowerCase().includes(inventoryFilterOperacion.toLowerCase())
+    );
+  }
+
+  if (inventoryFilterEquipo) {
+    filtered = filtered.filter((item) =>
+      item.equipo &&
+      item.equipo.toLowerCase().includes(inventoryFilterEquipo.toLowerCase())
+    );
+  }
+
+  // Agrupar por modelo para aplicar filtro de estado
+  const modelGroups = {};
+  filtered.forEach((item) => {
+    if (!modelGroups[item.modelo]) {
+      modelGroups[item.modelo] = {
+        items: [],
+        total: 0,
+        stockMinimo:
+          modelStockConfig[item.modelo]?.stockMinimo ||
+          parseInt(item.stockMinimo) ||
+          10,
+        stockMaximo:
+          modelStockConfig[item.modelo]?.stockMaximo ||
+          parseInt(item.stockMaximo) ||
+          100,
+      };
+    }
+    modelGroups[item.modelo].items.push(item);
+    modelGroups[item.modelo].total += parseInt(item.cantidad) || 0;
+  });
+
+  // Filtrar por estado de stock
+  if (inventoryFilterEstado && inventoryFilterEstado !== "todos") {
+    const modelosPermitidos = new Set();
+    
+    Object.entries(modelGroups).forEach(([modelo, data]) => {
+      const isCritical = data.total <= data.stockMinimo * 0.5;
+      const isLow = data.total <= data.stockMinimo && !isCritical;
+      const isHigh = data.total >= data.stockMaximo;
+      const isOk = !isCritical && !isLow && !isHigh;
+
+      if (
+        (inventoryFilterEstado === "critico" && isCritical) ||
+        (inventoryFilterEstado === "bajo" && isLow) ||
+        (inventoryFilterEstado === "alto" && isHigh) ||
+        (inventoryFilterEstado === "ok" && isOk)
+      ) {
+        modelosPermitidos.add(modelo);
+      }
+    });
+
+    filtered = filtered.filter((item) => modelosPermitidos.has(item.modelo));
+  }
+
+  // Ordenar según criterio seleccionado
+  const sortedGroups = Object.entries(modelGroups).sort(([modeloA, dataA], [modeloB, dataB]) => {
+    let comparison = 0;
+
+    switch (inventorySortBy) {
+      case "cantidad":
+        comparison = dataA.total - dataB.total;
+        break;
+      case "ubicaciones":
+        comparison = dataA.items.length - dataB.items.length;
+        break;
+      case "estado":
+        // Ordenar por criticidad: crítico > bajo > alto > ok
+        const getEstadoPrioridad = (data) => {
+          const isCritical = data.total <= data.stockMinimo * 0.5;
+          const isLow = data.total <= data.stockMinimo && !isCritical;
+          const isHigh = data.total >= data.stockMaximo;
+          if (isCritical) return 4;
+          if (isLow) return 3;
+          if (isHigh) return 2;
+          return 1;
+        };
+        comparison = getEstadoPrioridad(dataA) - getEstadoPrioridad(dataB);
+        break;
+      case "modelo":
+      default:
+        comparison = modeloA.localeCompare(modeloB);
+        break;
+    }
+
+    return inventorySortOrder === "asc" ? comparison : -comparison;
+  });
+
+  // Reconstruir array filtrado en el orden correcto
+  const orderedFiltered = [];
+  sortedGroups.forEach(([modelo]) => {
+    const itemsDelModelo = filtered.filter((item) => item.modelo === modelo);
+    orderedFiltered.push(...itemsDelModelo);
+  });
+
+  return orderedFiltered;
+};
+
+const filteredInventory = getFilteredAndSortedInventory();
 
         const getLowStockItems = () => {
           return inventory.filter(
@@ -4544,222 +4672,323 @@
                         1
                       );
 
-                      // GRÁFICA DE BARRAS
-                      if (chartViewType === "bar") {
-                        return (
-                          <div>
-                            <div className="relative h-80 flex items-end justify-between gap-1">
-                              {data
-                                .slice(0, 20)
-                                .reverse()
-                                .map((period, i) => {
-                                  const height =
-                                    (period.totalQuantity / maxValue) * 100;
-                                  const isRecent =
-                                    i >= data.slice(0, 20).length - 3;
+ // GRÁFICA DE BARRAS CON SCROLL HORIZONTAL
+if (chartViewType === "bar") {
+  return (
+    <div>
+      {/* Contenedor con scroll horizontal */}
+      <div className="overflow-x-auto pb-4">
+        <div 
+          className="relative h-80 flex items-end justify-between gap-1"
+          style={{ minWidth: `${Math.max(data.slice(0, 20).length * 60, 100)}px` }}
+        >
+          {data
+            .slice(0, 20)
+            .reverse()
+            .map((period, i) => {
+              const height = (period.totalQuantity / maxValue) * 100;
+              const isRecent = i >= data.slice(0, 20).length - 3;
 
-                                  return (
-                                    <div
-                                      key={period.key}
-                                      className="flex-1 flex flex-col items-center justify-end h-full group"
-                                    >
-                                      <div className="text-center mb-1 opacity-0 group-hover:opacity-100 transition">
-                                        <p className="text-xs font-bold text-white bg-slate-900 px-2 py-1 rounded">
-                                          {period.totalQuantity}
-                                        </p>
-                                      </div>
-                                      <div
-                                        className={`w-full rounded-t transition-all duration-300 ${
-                                          isRecent
-                                            ? "bg-green-500"
-                                            : "bg-blue-500"
-                                        } hover:opacity-80`}
-                                        style={{ height: `${height}%` }}
-                                        title={`${period.display}: ${period.totalQuantity}`}
-                                      ></div>
-                                      <p className="text-xs text-slate-400 mt-1 truncate max-w-full">
-                                        {period.display.slice(0, 10)}
-                                      </p>
-                                    </div>
-                                  );
-                                })}
-                            </div>
+              return (
+                <div
+                  key={period.key}
+                  className="flex flex-col items-center justify-end h-full group"
+                  style={{ minWidth: '50px', flex: '0 0 auto' }}
+                >
+                  <div className="text-center mb-1 opacity-0 group-hover:opacity-100 transition">
+                    <p className="text-xs font-bold text-white bg-slate-900 px-2 py-1 rounded whitespace-nowrap">
+                      {period.totalQuantity}
+                    </p>
+                  </div>
+                  <div
+                    className={`w-full rounded-t transition-all duration-300 ${
+                      isRecent ? "bg-green-500" : "bg-blue-500"
+                    } hover:opacity-80`}
+                    style={{ height: `${Math.max(height, 2)}%` }}
+                    title={`${period.display}: ${period.totalQuantity}`}
+                  ></div>
+                  <p className="text-xs text-slate-400 mt-1 truncate max-w-full transform rotate-45 origin-left whitespace-nowrap">
+                    {period.display.slice(0, 10)}
+                  </p>
+                </div>
+              );
+            })}
+        </div>
+      </div>
 
-                            {/* Estadísticas */}
-                            <div className="grid grid-cols-4 gap-4 mt-6 pt-4 border-t border-slate-700">
-                              <div className="text-center bg-blue-900/20 p-3 rounded">
-                                <p className="text-2xl font-bold text-white">
-                                  {data.length}
-                                </p>
-                                <p className="text-xs text-slate-400">
-                                  Períodos
-                                </p>
-                              </div>
-                              <div className="text-center bg-green-900/20 p-3 rounded">
-                                <p className="text-2xl font-bold text-green-400">
-                                  {data
-                                    .reduce((s, p) => s + p.totalQuantity, 0)
-                                    .toLocaleString()}
-                                </p>
-                                <p className="text-xs text-slate-400">Total</p>
-                              </div>
-                              <div className="text-center bg-purple-900/20 p-3 rounded">
-                                <p className="text-2xl font-bold text-purple-400">
-                                  {Math.round(
-                                    data.reduce(
-                                      (s, p) => s + p.totalQuantity,
-                                      0
-                                    ) / data.length
-                                  )}
-                                </p>
-                                <p className="text-xs text-slate-400">
-                                  Promedio
-                                </p>
-                              </div>
-                              <div className="text-center bg-yellow-900/20 p-3 rounded">
-                                <p className="text-2xl font-bold text-yellow-400">
-                                  {Math.max(
-                                    ...data.map((p) => p.totalQuantity)
-                                  )}
-                                </p>
-                                <p className="text-xs text-slate-400">Máximo</p>
-                              </div>
-                            </div>
-                          </div>
-                        );
+      {/* Estadísticas */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-4 border-t border-slate-700">
+        <div className="text-center bg-blue-900/20 p-3 rounded">
+          <p className="text-2xl font-bold text-white">{data.length}</p>
+          <p className="text-xs text-slate-400">Períodos</p>
+        </div>
+        <div className="text-center bg-green-900/20 p-3 rounded">
+          <p className="text-2xl font-bold text-green-400">
+            {data.reduce((s, p) => s + p.totalQuantity, 0).toLocaleString()}
+          </p>
+          <p className="text-xs text-slate-400">Total</p>
+        </div>
+        <div className="text-center bg-purple-900/20 p-3 rounded">
+          <p className="text-2xl font-bold text-purple-400">
+            {Math.round(data.reduce((s, p) => s + p.totalQuantity, 0) / data.length)}
+          </p>
+          <p className="text-xs text-slate-400">Promedio</p>
+        </div>
+        <div className="text-center bg-yellow-900/20 p-3 rounded">
+          <p className="text-2xl font-bold text-yellow-400">
+            {Math.max(...data.map((p) => p.totalQuantity))}
+          </p>
+          <p className="text-xs text-slate-400">Máximo</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+           // GRÁFICA DE LÍNEAS CON RESPONSIVE
+if (chartViewType === "line") {
+  return (
+    <div className="overflow-x-auto">
+      <svg
+        width="100%"
+        height="300"
+        viewBox="0 0 800 300"
+        className="min-w-[600px]"
+      >
+        {data
+          .slice(0, 15)
+          .reverse()
+          .map((p, i, arr) => {
+            const x1 = 50 + (i / (arr.length - 1)) * 700;
+            const y1 = 250 - (p.totalQuantity / maxValue) * 200;
+            const x2 =
+              i < arr.length - 1
+                ? 50 + ((i + 1) / (arr.length - 1)) * 700
+                : x1;
+            const y2 =
+              i < arr.length - 1
+                ? 250 - (arr[i + 1].totalQuantity / maxValue) * 200
+                : y1;
+
+            return (
+              <g key={i}>
+                {i < arr.length - 1 && (
+                  <line
+                    x1={x1}
+                    y1={y1}
+                    x2={x2}
+                    y2={y2}
+                    stroke="#3b82f6"
+                    strokeWidth="3"
+                  />
+                )}
+                <circle cx={x1} cy={y1} r="5" fill="#3b82f6" />
+                <text x={x1} y={y1 - 10} textAnchor="middle" fill="#fff" fontSize="10">
+                  {p.totalQuantity}
+                </text>
+                <title>{p.display}: {p.totalQuantity}</title>
+              </g>
+            );
+          })}
+      </svg>
+      <p className="text-center text-slate-400 mt-4">
+        Total: {data.reduce((s, p) => s + p.totalQuantity, 0).toLocaleString()}
+      </p>
+    </div>
+  );
+}
+
+                     // GRÁFICA DE ÁREA CON RESPONSIVE
+if (chartViewType === "area") {
+  const points = data.slice(0, 15).reverse();
+  const pathData = points
+    .map((p, i) => {
+      const x = 50 + (i / (points.length - 1)) * 700;
+      const y = 250 - (p.totalQuantity / maxValue) * 200;
+      return `${i === 0 ? "M" : "L"} ${x} ${y}`;
+    })
+    .join(" ");
+
+  return (
+    <div className="overflow-x-auto">
+      <svg width="100%" height="300" viewBox="0 0 800 300" className="min-w-[600px]">
+        <defs>
+          <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="rgba(59, 130, 246, 0.5)" />
+            <stop offset="100%" stopColor="rgba(59, 130, 246, 0.1)" />
+          </linearGradient>
+        </defs>
+        <path
+          d={`${pathData} L 750 250 L 50 250 Z`}
+          fill="url(#areaGradient)"
+        />
+        <path d={pathData} fill="none" stroke="#3b82f6" strokeWidth="3" />
+        {points.map((p, i) => {
+          const x = 50 + (i / (points.length - 1)) * 700;
+          const y = 250 - (p.totalQuantity / maxValue) * 200;
+          return (
+            <g key={i}>
+              <circle cx={x} cy={y} r="4" fill="#3b82f6" />
+              <title>{p.display}: {p.totalQuantity}</title>
+            </g>
+          );
+        })}
+      </svg>
+      <p className="text-center text-slate-400 mt-4">
+        Total: {data.reduce((s, p) => s + p.totalQuantity, 0).toLocaleString()}
+      </p>
+    </div>
+  );
+}
+
+// TABLA CON DESGLOSE POR MODELOS
+return (
+  <div className="space-y-6">
+    {/* Tabla principal con scroll horizontal para móviles */}
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm min-w-[600px]">
+        <thead className="bg-slate-800 sticky top-0">
+          <tr>
+            <th className="p-3 text-left text-slate-300">Período</th>
+            <th className="p-3 text-right text-slate-300">Cantidad Total</th>
+            <th className="p-3 text-right text-slate-300">Items</th>
+            <th className="p-3 text-right text-slate-300">Modelos Únicos</th>
+            <th className="p-3 text-center text-slate-300">Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.slice(0, 15).map((p, idx) => (
+            <React.Fragment key={p.key}>
+              <tr className="border-b border-slate-700 hover:bg-slate-800/50">
+                <td className="p-3 text-white font-semibold">{p.display}</td>
+                <td className="p-3 text-right text-green-400 font-bold text-lg">
+                  {p.totalQuantity.toLocaleString()}
+                </td>
+                <td className="p-3 text-right text-slate-400">{p.itemCount}</td>
+                <td className="p-3 text-right text-blue-400">
+                  {Object.keys(p.models).length}
+                </td>
+                <td className="p-3 text-center">
+                  <button
+                    onClick={() => {
+                      const detailId = `detail-${p.key}`;
+                      const detailRow = document.getElementById(detailId);
+                      if (detailRow) {
+                        detailRow.style.display = 
+                          detailRow.style.display === 'none' ? 'table-row' : 'none';
                       }
-
-                      // GRÁFICA DE LÍNEAS
-                      if (chartViewType === "line") {
-                        return (
-                          <div>
-                            <svg
-                              width="100%"
-                              height="300"
-                              viewBox="0 0 800 300"
-                            >
-                              {data
-                                .slice(0, 15)
-                                .reverse()
-                                .map((p, i, arr) => {
-                                  const x1 = 50 + (i / (arr.length - 1)) * 700;
-                                  const y1 =
-                                    250 - (p.totalQuantity / maxValue) * 200;
-                                  const x2 =
-                                    i < arr.length - 1
-                                      ? 50 + ((i + 1) / (arr.length - 1)) * 700
-                                      : x1;
-                                  const y2 =
-                                    i < arr.length - 1
-                                      ? 250 -
-                                        (arr[i + 1].totalQuantity / maxValue) *
-                                          200
-                                      : y1;
-
-                                  return (
-                                    <g key={i}>
-                                      {i < arr.length - 1 && (
-                                        <line
-                                          x1={x1}
-                                          y1={y1}
-                                          x2={x2}
-                                          y2={y2}
-                                          stroke="#3b82f6"
-                                          strokeWidth="2"
-                                        />
-                                      )}
-                                      <circle
-                                        cx={x1}
-                                        cy={y1}
-                                        r="4"
-                                        fill="#3b82f6"
-                                      />
-                                      <title>
-                                        {p.display}: {p.totalQuantity}
-                                      </title>
-                                    </g>
-                                  );
-                                })}
-                            </svg>
-                            <p className="text-center text-slate-400 mt-4">
-                              Total:{" "}
-                              {data.reduce((s, p) => s + p.totalQuantity, 0)}
+                    }}
+                    className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-semibold"
+                  >
+                    📊 Ver Detalle
+                  </button>
+                </td>
+              </tr>
+              
+              {/* Fila expandible con desglose por modelo */}
+              <tr id={`detail-${p.key}`} style={{ display: 'none' }} className="bg-slate-900/70">
+                <td colSpan="5" className="p-4">
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-bold text-blue-300 mb-3">
+                      📦 Desglose por Modelo - {p.display}
+                    </h4>
+                    
+                    {/* Grid responsive para modelos */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {Object.entries(p.models)
+                        .sort(([, a], [, b]) => b - a)
+                        .map(([modelo, cantidad]) => (
+                          <div 
+                            key={modelo} 
+                            className="bg-slate-800/50 p-3 rounded-lg border border-slate-700"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-white font-medium text-sm truncate flex-1">
+                                {modelo}
+                              </span>
+                              <span className="text-green-400 font-bold text-lg ml-2">
+                                {cantidad}
+                              </span>
+                            </div>
+                            <div className="mt-2 w-full bg-slate-700 rounded-full h-2">
+                              <div
+                                className="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all"
+                                style={{ width: `${(cantidad / p.totalQuantity) * 100}%` }}
+                              ></div>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-1">
+                              {((cantidad / p.totalQuantity) * 100).toFixed(1)}% del total
                             </p>
                           </div>
-                        );
-                      }
+                        ))}
+                    </div>
 
-                      // GRÁFICA DE ÁREA
-                      if (chartViewType === "area") {
-                        const points = data.slice(0, 15).reverse();
-                        const pathData = points
-                          .map((p, i) => {
-                            const x = 50 + (i / (points.length - 1)) * 700;
-                            const y = 250 - (p.totalQuantity / maxValue) * 200;
-                            return `${i === 0 ? "M" : "L"} ${x} ${y}`;
-                          })
-                          .join(" ");
+                    {/* Resumen adicional */}
+                    <div className="mt-4 pt-3 border-t border-slate-700 grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="bg-blue-900/20 p-2 rounded text-center">
+                        <p className="text-xs text-blue-300">Operaciones</p>
+                        <p className="text-sm font-bold text-white">
+                          {Object.keys(p.byOperation).length}
+                        </p>
+                      </div>
+                      <div className="bg-purple-900/20 p-2 rounded text-center">
+                        <p className="text-xs text-purple-300">Ubicaciones</p>
+                        <p className="text-sm font-bold text-white">
+                          {Object.keys(p.byLocation).length}
+                        </p>
+                      </div>
+                      <div className="bg-green-900/20 p-2 rounded text-center">
+                        <p className="text-xs text-green-300">Equipos</p>
+                        <p className="text-sm font-bold text-white">
+                          {Object.keys(p.byEquipo).length || 0}
+                        </p>
+                      </div>
+                      <div className="bg-yellow-900/20 p-2 rounded text-center">
+                        <p className="text-xs text-yellow-300">Modelo Top</p>
+                        <p className="text-sm font-bold text-white truncate">
+                          {Object.entries(p.models).sort(([, a], [, b]) => b - a)[0]?.[0] || 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </React.Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
 
-                        return (
-                          <svg width="100%" height="300" viewBox="0 0 800 300">
-                            <path
-                              d={`${pathData} L 750 250 L 50 250 Z`}
-                              fill="rgba(59, 130, 246, 0.3)"
-                            />
-                            <path
-                              d={pathData}
-                              fill="none"
-                              stroke="#3b82f6"
-                              strokeWidth="2"
-                            />
-                          </svg>
-                        );
-                      }
-
-                      // TABLA
-                      return (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead className="bg-slate-800">
-                              <tr>
-                                <th className="p-3 text-left text-slate-300">
-                                  Período
-                                </th>
-                                <th className="p-3 text-right text-slate-300">
-                                  Cantidad
-                                </th>
-                                <th className="p-3 text-right text-slate-300">
-                                  Items
-                                </th>
-                                <th className="p-3 text-right text-slate-300">
-                                  Modelos
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {data.slice(0, 15).map((p) => (
-                                <tr
-                                  key={p.key}
-                                  className="border-b border-slate-700"
-                                >
-                                  <td className="p-3 text-white">
-                                    {p.display}
-                                  </td>
-                                  <td className="p-3 text-right text-green-400 font-bold">
-                                    {p.totalQuantity}
-                                  </td>
-                                  <td className="p-3 text-right text-slate-400">
-                                    {p.itemCount}
-                                  </td>
-                                  <td className="p-3 text-right text-blue-400">
-                                    {Object.keys(p.models).length}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      );
+    {/* Resumen global */}
+    <div className="mt-6 p-4 bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-lg border border-blue-500/50">
+      <h4 className="text-white font-bold mb-3">📈 Resumen Global</h4>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="text-center">
+          <p className="text-2xl font-bold text-white">{data.length}</p>
+          <p className="text-xs text-slate-400">Períodos Analizados</p>
+        </div>
+        <div className="text-center">
+          <p className="text-2xl font-bold text-green-400">
+            {data.reduce((s, p) => s + p.totalQuantity, 0).toLocaleString()}
+          </p>
+          <p className="text-xs text-slate-400">Cantidad Total</p>
+        </div>
+        <div className="text-center">
+          <p className="text-2xl font-bold text-blue-400">
+            {[...new Set(data.flatMap(p => Object.keys(p.models)))].length}
+          </p>
+          <p className="text-xs text-slate-400">Modelos Únicos</p>
+        </div>
+        <div className="text-center">
+          <p className="text-2xl font-bold text-purple-400">
+            {Math.round(data.reduce((s, p) => s + p.totalQuantity, 0) / data.length)}
+          </p>
+          <p className="text-xs text-slate-400">Promedio/Período</p>
+        </div>
+      </div>
+    </div>
+  </div>
+);
                     })()}
                   </div>
                 </div>
@@ -5422,21 +5651,24 @@
                   <h2 className="text-xl font-bold text-white">
                     📦 Inventario por Modelo
                   </h2>
-                  <button
-                    onClick={() => {
-                      setSelectionMode(!selectionMode);
-                      if (selectionMode) setSelectedItems([]);
-                    }}
-                    className={`px-3 py-1 rounded-lg text-sm font-semibold transition-colors ${
-                      selectionMode
-                        ? "bg-yellow-500 text-slate-900"
-                        : "bg-slate-700 text-white hover:bg-slate-600"
-                    }`}
-                  >
-                    {selectionMode
-                      ? "🚫 Cancelar Selección"
-                      : "✔️ Selección Múltiple"}
-                  </button>
+                  {/* Solo mostrar selección múltiple si es admin principal */}
+{currentUser?.email === "admin@empresa.com" && (
+  <button
+    onClick={() => {
+      setSelectionMode(!selectionMode);
+      if (selectionMode) setSelectedItems([]);
+    }}
+    className={`px-3 py-1 rounded-lg text-sm font-semibold transition-colors ${
+      selectionMode
+        ? "bg-yellow-500 text-slate-900"
+        : "bg-slate-700 text-white hover:bg-slate-600"
+    }`}
+  >
+    {selectionMode
+      ? "🚫 Cancelar Selección"
+      : "✔️ Selección Múltiple"}
+  </button>
+)}
                 </div>
 
                 <div className="relative">
@@ -5454,6 +5686,163 @@
                   />
                 </div>
               </div>
+{/* PANEL DE FILTROS Y ORDENAMIENTO AVANZADO */}
+<div className="mb-4 p-4 bg-slate-900/30 rounded-lg border border-slate-700">
+  <div className="flex items-center justify-between mb-3">
+    <div className="flex items-center gap-2">
+      <Filter className="text-blue-400" />
+      <h4 className="text-white font-semibold text-sm">Filtros y Ordenamiento</h4>
+    </div>
+    {(inventoryFilterModelo || inventoryFilterUbicacion || inventoryFilterOperacion || 
+      inventoryFilterEquipo || inventoryFilterEstado !== "") && (
+      <button
+        onClick={() => {
+          setInventoryFilterModelo("");
+          setInventoryFilterUbicacion("");
+          setInventoryFilterOperacion("");
+          setInventoryFilterEquipo("");
+          setInventoryFilterEstado("");
+        }}
+        className="text-xs text-red-400 hover:text-red-300 underline"
+      >
+        Limpiar Filtros
+      </button>
+    )}
+  </div>
+
+  {/* Grid de Filtros */}
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 mb-3">
+    <div>
+      <label className="block text-xs text-slate-400 mb-1">🏷️ Modelo</label>
+      <input
+        type="text"
+        value={inventoryFilterModelo}
+        onChange={(e) => setInventoryFilterModelo(e.target.value)}
+        placeholder="Filtrar por modelo..."
+        className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+      />
+    </div>
+
+    <div>
+      <label className="block text-xs text-slate-400 mb-1">📍 Ubicación</label>
+      <input
+        type="text"
+        value={inventoryFilterUbicacion}
+        onChange={(e) => setInventoryFilterUbicacion(e.target.value)}
+        placeholder="Filtrar por ubicación..."
+        className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+      />
+    </div>
+
+    <div>
+      <label className="block text-xs text-slate-400 mb-1">⚙️ Operación</label>
+      <input
+        type="text"
+        value={inventoryFilterOperacion}
+        onChange={(e) => setInventoryFilterOperacion(e.target.value)}
+        placeholder="Filtrar por operación..."
+        className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+      />
+    </div>
+
+    <div>
+      <label className="block text-xs text-slate-400 mb-1">🔧 Equipo</label>
+      <input
+        type="text"
+        value={inventoryFilterEquipo}
+        onChange={(e) => setInventoryFilterEquipo(e.target.value)}
+        placeholder="Filtrar por equipo..."
+        className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+      />
+    </div>
+
+    <div>
+      <label className="block text-xs text-slate-400 mb-1">📊 Estado Stock</label>
+      <select
+        value={inventoryFilterEstado}
+        onChange={(e) => setInventoryFilterEstado(e.target.value)}
+        className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+      >
+        <option value="">Todos</option>
+        <option value="critico">🔴 Crítico</option>
+        <option value="bajo">⚠️ Bajo</option>
+        <option value="alto">📦 Alto</option>
+        <option value="ok">✅ OK</option>
+      </select>
+    </div>
+  </div>
+
+  {/* Controles de Ordenamiento */}
+  <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-slate-700">
+    <span className="text-sm text-slate-400">Ordenar por:</span>
+    
+    <button
+      onClick={() => setInventorySortBy("modelo")}
+      className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+        inventorySortBy === "modelo"
+          ? "bg-blue-600 text-white"
+          : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+      }`}
+    >
+      🏷️ Modelo
+    </button>
+
+    <button
+      onClick={() => setInventorySortBy("cantidad")}
+      className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+        inventorySortBy === "cantidad"
+          ? "bg-blue-600 text-white"
+          : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+      }`}
+    >
+      📊 Cantidad Total
+    </button>
+
+    <button
+      onClick={() => setInventorySortBy("ubicaciones")}
+      className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+        inventorySortBy === "ubicaciones"
+          ? "bg-blue-600 text-white"
+          : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+      }`}
+    >
+      📍 Nº Ubicaciones
+    </button>
+
+    <button
+      onClick={() => setInventorySortBy("estado")}
+      className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+        inventorySortBy === "estado"
+          ? "bg-blue-600 text-white"
+          : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+      }`}
+    >
+      ⚠️ Estado Stock
+    </button>
+
+    <div className="ml-auto flex items-center gap-2">
+      <span className="text-xs text-slate-400">Orden:</span>
+      <button
+        onClick={() => setInventorySortOrder(inventorySortOrder === "asc" ? "desc" : "asc")}
+        className="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-semibold flex items-center gap-1"
+      >
+        {inventorySortOrder === "asc" ? "↑ Ascendente" : "↓ Descendente"}
+      </button>
+    </div>
+  </div>
+
+  {/* Contador de resultados */}
+  <div className="mt-3 pt-3 border-t border-slate-700">
+    <p className="text-xs text-slate-400">
+      Mostrando <span className="text-blue-400 font-bold">{filteredInventory.length}</span> items de{" "}
+      <span className="text-white font-bold">{inventory.length}</span> totales
+      {(inventoryFilterModelo || inventoryFilterUbicacion || inventoryFilterOperacion || 
+        inventoryFilterEquipo || inventoryFilterEstado) && (
+        <span className="text-yellow-400 ml-2">(filtrado activo)</span>
+      )}
+    </p>
+  </div>
+</div>
 
               {/* BARRA DE ACCIONES MASIVAS */}
               {selectionMode && selectedItems.length > 0 && (
@@ -5690,7 +6079,9 @@
                                             <Edit2 />
                                           </button>
                                           <button
-                                            onClick={() => handleDelete(item.id)}
+                                            onClick={() =>
+                                              handleDelete(item.id)
+                                            }
                                             className="p-1.5 bg-red-600/20 text-red-400 rounded hover:bg-red-600/40"
                                           >
                                             <Trash2 />
