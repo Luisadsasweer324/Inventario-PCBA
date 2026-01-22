@@ -2146,53 +2146,84 @@
           e.target.value = "";
         };
 
-        // Filtrado y ordenamiento avanzado del inventario
-        const getFilteredAndSortedInventory = () => {
-          // Primero aplicar búsqueda general
-          let filtered = inventory.filter(
-            (item) =>
-              item.modelo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-              item.ubicacion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-              (item.equipo &&
-                item.equipo.toLowerCase().includes(searchTerm.toLowerCase())),
-          );
+       // Filtrado y ordenamiento avanzado del inventario
+const getFilteredAndSortedInventory = () => {
+  // Primero aplicar búsqueda general
+  let filtered = inventory.filter(
+    (item) =>
+      item.modelo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.ubicacion.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.equipo &&
+        item.equipo.toLowerCase().includes(searchTerm.toLowerCase())),
+  );
 
-          // Aplicar filtros específicos
-          if (inventoryFilterModelo) {
-            filtered = filtered.filter((item) =>
-              item.modelo
-                .toLowerCase()
-                .includes(inventoryFilterModelo.toLowerCase()),
-            );
-          }
+  // Aplicar filtros específicos CON COINCIDENCIA EXACTA O PRECISA
+  if (inventoryFilterModelo) {
+    const searchLower = inventoryFilterModelo.toLowerCase().trim();
+    filtered = filtered.filter((item) => {
+      const itemLower = item.modelo.toLowerCase().trim();
+      
+      // Coincidencia exacta tiene prioridad
+      if (itemLower === searchLower) return true;
+      
+      // Si busca solo números/letras al inicio, verificar que coincida al inicio
+      if (/^\d+$/.test(inventoryFilterModelo)) {
+        // Si busca solo números (ej: "1"), que coincida solo con "1", no con "10"
+        const parts = itemLower.split(/[\s-_]/); // Dividir por espacios, guiones, underscores
+        return parts.some(part => part === searchLower);
+      }
+      
+      // Para texto, que contenga la palabra completa
+      return itemLower.includes(searchLower);
+    });
+  }
 
-          if (inventoryFilterUbicacion) {
-            filtered = filtered.filter((item) =>
-              item.ubicacion
-                .toLowerCase()
-                .includes(inventoryFilterUbicacion.toLowerCase()),
-            );
-          }
+  if (inventoryFilterUbicacion) {
+    const searchLower = inventoryFilterUbicacion.toLowerCase().trim();
+    filtered = filtered.filter((item) => {
+      const itemLower = item.ubicacion.toLowerCase().trim();
+      
+      // Coincidencia exacta
+      if (itemLower === searchLower) return true;
+      
+      // Si busca "fila 1", que NO coincida con "fila 10"
+      if (/^fila\s*\d+$/i.test(inventoryFilterUbicacion)) {
+        const searchNum = inventoryFilterUbicacion.match(/\d+/)[0];
+        const itemMatch = itemLower.match(/fila\s*(\d+)/);
+        return itemMatch && itemMatch[1] === searchNum;
+      }
+      
+      // Para otros casos, coincidencia de palabra completa
+      const regex = new RegExp(`\\b${searchLower}\\b`, 'i');
+      return regex.test(itemLower);
+    });
+  }
 
-          if (inventoryFilterOperacion) {
-            filtered = filtered.filter(
-              (item) =>
-                item.operacionActual &&
-                item.operacionActual
-                  .toLowerCase()
-                  .includes(inventoryFilterOperacion.toLowerCase()),
-            );
-          }
+  if (inventoryFilterOperacion) {
+    const searchLower = inventoryFilterOperacion.toLowerCase().trim();
+    filtered = filtered.filter((item) => {
+      if (!item.operacionActual) return false;
+      const itemLower = item.operacionActual.toLowerCase().trim();
+      
+      // Coincidencia exacta o palabra completa
+      if (itemLower === searchLower) return true;
+      const regex = new RegExp(`\\b${searchLower}\\b`, 'i');
+      return regex.test(itemLower);
+    });
+  }
 
-          if (inventoryFilterEquipo) {
-            filtered = filtered.filter(
-              (item) =>
-                item.equipo &&
-                item.equipo
-                  .toLowerCase()
-                  .includes(inventoryFilterEquipo.toLowerCase()),
-            );
-          }
+  if (inventoryFilterEquipo) {
+    const searchLower = inventoryFilterEquipo.toLowerCase().trim();
+    filtered = filtered.filter((item) => {
+      if (!item.equipo) return false;
+      const itemLower = item.equipo.toLowerCase().trim();
+      
+      // Coincidencia exacta o palabra completa
+      if (itemLower === searchLower) return true;
+      const regex = new RegExp(`\\b${searchLower}\\b`, 'i');
+      return regex.test(itemLower);
+    });
+  }
 
           // Agrupar por modelo para aplicar filtro de estado
           const modelGroups = {};
