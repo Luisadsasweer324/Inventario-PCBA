@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
@@ -21,7 +21,9 @@
         font-family: "Inter", sans-serif;
         margin: 0;
         padding: 0;
-        transition: background-color 0.3s ease, color 0.3s ease;
+        transition:
+          background-color 0.3s ease,
+          color 0.3s ease;
       }
 
       body.light-mode {
@@ -750,7 +752,7 @@
         const [showWeeklyStats, setShowWeeklyStats] = useState(false);
         const [darkMode, setDarkMode] = useState(false);
         const [connectionStatus, setConnectionStatus] = useState(
-          firebaseInitialized ? "connected" : "local"
+          firebaseInitialized ? "connected" : "local",
         );
 
         // Filtros de historial
@@ -870,11 +872,11 @@
 
           if (
             confirm(
-              `¿Estás seguro de eliminar ${selectedItems.length} items seleccionados de forma permanente?`
+              `¿Estás seguro de eliminar ${selectedItems.length} items seleccionados de forma permanente?`,
             )
           ) {
             const updatedInventory = inventory.filter(
-              (item) => !selectedItems.includes(item.id)
+              (item) => !selectedItems.includes(item.id),
             );
             setInventory(updatedInventory);
             await saveToStorage("inventory-data", updatedInventory);
@@ -882,7 +884,7 @@
             addToHistory(
               "Eliminación Múltiple",
               `${currentUser.name} eliminó ${selectedItems.length} items del inventario.`,
-              currentUser
+              currentUser,
             );
 
             setSelectedItems([]);
@@ -926,7 +928,7 @@
           if (database) {
             database.ref(".info/connected").on("value", (snapshot) => {
               setConnectionStatus(
-                snapshot.val() ? "connected" : "disconnected"
+                snapshot.val() ? "connected" : "disconnected",
               );
             });
           }
@@ -963,9 +965,8 @@
               }
 
               // Cargar configuración de stock por modelo
-              const stockConfigResult = await window.storage.get(
-                "model-stock-config"
-              );
+              const stockConfigResult =
+                await window.storage.get("model-stock-config");
               if (stockConfigResult) {
                 setModelStockConfig(JSON.parse(stockConfigResult.value));
               }
@@ -988,7 +989,7 @@
 
                 // Asegurar que el admin principal siempre esté
                 const hasAdmin = migratedUsers.find(
-                  (u) => u.email === "admin@empresa.com"
+                  (u) => u.email === "admin@empresa.com",
                 );
                 if (!hasAdmin) {
                   setUsers([
@@ -1022,13 +1023,12 @@
                 setUsers(defaultAdmin);
                 await window.storage.set(
                   "approved-users",
-                  JSON.stringify(defaultAdmin)
+                  JSON.stringify(defaultAdmin),
                 );
               }
 
-              const pendingMatResult = await window.storage.get(
-                "pending-materials"
-              );
+              const pendingMatResult =
+                await window.storage.get("pending-materials");
               if (pendingMatResult)
                 setPendingMaterials(JSON.parse(pendingMatResult.value));
 
@@ -1089,7 +1089,7 @@
           if (!confirm("¿Eliminar esta entrada del historial?")) return;
 
           const updatedHistory = changeHistory.filter(
-            (entry) => entry.id !== entryId
+            (entry) => entry.id !== entryId,
           );
           setChangeHistory(updatedHistory);
           saveToStorage("change-history", updatedHistory);
@@ -1105,7 +1105,7 @@
             (u) =>
               u.email === email &&
               u.password === password &&
-              u.status === "approved"
+              u.status === "approved",
           );
 
           if (user) {
@@ -1114,7 +1114,7 @@
             addToHistory(
               "Inicio de sesión",
               `Usuario ${user.name} inició sesión`,
-              user
+              user,
             );
             setView("dashboard");
           } else {
@@ -1155,12 +1155,12 @@
           await sendEmail(
             "admin@empresa.com",
             "🔔 Nueva solicitud de cuenta",
-            `${name} (${email}) solicitó acceso`
+            `${name} (${email}) solicitó acceso`,
           );
           addToHistory(
             "Solicitud de cuenta",
             `${name} (${email}) solicitó una cuenta`,
-            { name: "Sistema" }
+            { name: "Sistema" },
           );
           setView("pending");
         };
@@ -1169,7 +1169,7 @@
           addToHistory(
             "Cierre de sesión",
             `Usuario ${currentUser.name} cerró sesión`,
-            currentUser
+            currentUser,
           );
           setCurrentUser(null);
           localStorage.removeItem("current-user-session");
@@ -1191,7 +1191,7 @@
             alert(
               `🧹 Se limpiaron ${
                 pendingMaterials.length - cleaned.length
-              } solicitudes procesadas antiguas`
+              } solicitudes procesadas antiguas`,
             );
           } else {
             alert("✨ No hay solicitudes antiguas para limpiar");
@@ -1221,12 +1221,12 @@
             await sendEmail(
               userToApprove.email,
               "✅ Cuenta Aprobada",
-              "Tu cuenta ha sido aprobada"
+              "Tu cuenta ha sido aprobada",
             );
             addToHistory(
               "Aprobación de usuario",
               `Admin aprobó la cuenta de ${userToApprove.name} (${userToApprove.email})`,
-              currentUser
+              currentUser,
             );
 
             alert(`✅ Usuario ${userToApprove.name} aprobado correctamente`);
@@ -1243,12 +1243,12 @@
             await sendEmail(
               userToReject.email,
               "❌ Solicitud Rechazada",
-              "Tu solicitud fue rechazada"
+              "Tu solicitud fue rechazada",
             );
             addToHistory(
               "Rechazo de usuario",
               `Admin rechazó la cuenta de ${userToReject.name}`,
-              currentUser
+              currentUser,
             );
           }
         };
@@ -1268,7 +1268,7 @@
                 `${currentUser.name} cambió el rol de ${user.name} a ${
                   newRole === "admin" ? "Administrador" : "Usuario"
                 }`,
-                currentUser
+                currentUser,
               );
               return { ...user, role: newRole };
             }
@@ -1279,13 +1279,13 @@
           await saveToStorage("approved-users", updatedUsers);
 
           const updatedCurrentUser = updatedUsers.find(
-            (u) => u.id === currentUser.id
+            (u) => u.id === currentUser.id,
           );
           if (updatedCurrentUser) {
             setCurrentUser(updatedCurrentUser);
             localStorage.setItem(
               "current-user-session",
-              JSON.stringify(updatedCurrentUser)
+              JSON.stringify(updatedCurrentUser),
             );
           }
         };
@@ -1305,7 +1305,7 @@
 
           if (
             window.confirm(
-              `¿Estás seguro de eliminar al usuario ${userToDelete?.name}?`
+              `¿Estás seguro de eliminar al usuario ${userToDelete?.name}?`,
             )
           ) {
             const updatedUsers = users.filter((u) => u.id !== userId);
@@ -1314,7 +1314,7 @@
             addToHistory(
               "Usuario eliminado",
               `Admin eliminó al usuario ${userToDelete.name}`,
-              currentUser
+              currentUser,
             );
           }
         };
@@ -1327,7 +1327,7 @@
           }
 
           const updatedUsers = users.map((u) =>
-            u.id === userId ? { ...u, canApprove: !u.canApprove } : u
+            u.id === userId ? { ...u, canApprove: !u.canApprove } : u,
           );
           setUsers(updatedUsers);
           await saveToStorage("approved-users", updatedUsers);
@@ -1338,7 +1338,7 @@
             `Admin ${
               user.canApprove ? "otorgó" : "revocó"
             } permisos de aprobación a ${user.name}`,
-            currentUser
+            currentUser,
           );
         };
 
@@ -1382,7 +1382,7 @@
               !formData.fechaEtiqueta
             ) {
               alert(
-                "⚠️ Completa: Modelo, Cantidad, Ubicación y Fecha de Etiqueta"
+                "⚠️ Completa: Modelo, Cantidad, Ubicación y Fecha de Etiqueta",
               );
               return;
             }
@@ -1449,10 +1449,10 @@
               addToHistory(
                 "Carga por Lote",
                 `Admin agregó ${itemsToProcess.length} items masivamente`,
-                currentUser
+                currentUser,
               );
               alert(
-                `✅ Se agregaron ${itemsToProcess.length} items al inventario.`
+                `✅ Se agregaron ${itemsToProcess.length} items al inventario.`,
               );
             } else {
               // === LÓGICA DE USUARIO (SOLICITUD) ===
@@ -1462,10 +1462,10 @@
               addToHistory(
                 "Solicitud por Lote",
                 `${currentUser.name} solicitó ${itemsToProcess.length} items`,
-                currentUser
+                currentUser,
               );
               alert(
-                `✅ Se enviaron ${itemsToProcess.length} solicitudes al administrador.`
+                `✅ Se enviaron ${itemsToProcess.length} solicitudes al administrador.`,
               );
             }
 
@@ -1509,7 +1509,7 @@
             setModelStockConfig(newConfig);
             await window.storage.set(
               "model-stock-config",
-              JSON.stringify(newConfig)
+              JSON.stringify(newConfig),
             );
           }
 
@@ -1537,7 +1537,7 @@
             addToHistory(
               "Material agregado",
               `${currentUser.name} agregó: ${formData.modelo} (${formData.cantidad} unidades) en ${formData.ubicacion}`,
-              currentUser
+              currentUser,
             );
 
             setFormData({
@@ -1577,7 +1577,7 @@
           addToHistory(
             "Solicitud de material",
             `${currentUser.name} solicitó: ${formData.modelo} en ${formData.ubicacion}`,
-            currentUser
+            currentUser,
           );
 
           setFormData({
@@ -1658,7 +1658,7 @@
             addToHistory(
               "Lote de materiales agregado",
               `${currentUser.name} agregó ${batchItems.length} materiales en lote`,
-              currentUser
+              currentUser,
             );
 
             setBatchItems([]);
@@ -1701,7 +1701,7 @@
           addToHistory(
             "Lote de solicitudes",
             `${currentUser.name} solicitó ${batchItems.length} materiales en lote`,
-            currentUser
+            currentUser,
           );
 
           setBatchItems([]);
@@ -1719,7 +1719,7 @@
           });
 
           alert(
-            `✅ ${batchItems.length} solicitudes enviadas al administrador`
+            `✅ ${batchItems.length} solicitudes enviadas al administrador`,
           );
         };
 
@@ -1735,7 +1735,7 @@
             currentUser?.email !== "admin@empresa.com"
           ) {
             alert(
-              "❌ No tienes permisos para aprobar solicitudes.\nContacta al administrador principal."
+              "❌ No tienes permisos para aprobar solicitudes.\nContacta al administrador principal.",
             );
             return;
           }
@@ -1745,7 +1745,7 @@
             // Verificar si ya fue procesada
             if (material.status !== "pending") {
               alert(
-                "⚠️ Esta solicitud ya fue procesada por otro administrador"
+                "⚠️ Esta solicitud ya fue procesada por otro administrador",
               );
               return;
             }
@@ -1754,7 +1754,7 @@
               (item) =>
                 item.modelo.toLowerCase() === material.modelo.toLowerCase() &&
                 item.ubicacion.toLowerCase() ===
-                  material.ubicacion.toLowerCase()
+                  material.ubicacion.toLowerCase(),
             );
 
             let updatedInventory;
@@ -1768,14 +1768,14 @@
                       cantidad:
                         parseInt(item.cantidad) + parseInt(material.cantidad),
                     }
-                  : item
+                  : item,
               );
               addToHistory(
                 "Material agregado (suma)",
                 `Admin sumó ${material.cantidad} de ${material.modelo} en ${
                   material.ubicacion
                 }. Total: ${existingItem.cantidad + material.cantidad}`,
-                currentUser
+                currentUser,
               );
             } else {
               const newItem = {
@@ -1797,7 +1797,7 @@
               addToHistory(
                 "Material agregado (nuevo)",
                 `Admin aprobó: ${material.modelo} (${material.cantidad} unidades) en ${material.ubicacion}`,
-                currentUser
+                currentUser,
               );
             }
 
@@ -1813,7 +1813,7 @@
                     processedBy: currentUser.name,
                     processedDate: new Date().toISOString(),
                   }
-                : m
+                : m,
             );
             setPendingMaterials(updatedPending);
             saveToStorage("pending-materials", updatedPending);
@@ -1830,7 +1830,7 @@
             currentUser?.email !== "admin@empresa.com"
           ) {
             alert(
-              "❌ No tienes permisos para rechazar solicitudes.\nContacta al administrador principal."
+              "❌ No tienes permisos para rechazar solicitudes.\nContacta al administrador principal.",
             );
             return;
           }
@@ -1840,7 +1840,7 @@
             // Verificar si ya fue procesada
             if (material.status !== "pending") {
               alert(
-                "⚠️ Esta solicitud ya fue procesada por otro administrador"
+                "⚠️ Esta solicitud ya fue procesada por otro administrador",
               );
               return;
             }
@@ -1854,7 +1854,7 @@
                     processedBy: currentUser.name,
                     processedDate: new Date().toISOString(),
                   }
-                : m
+                : m,
             );
             setPendingMaterials(updatedPending);
             saveToStorage("pending-materials", updatedPending);
@@ -1862,7 +1862,7 @@
             addToHistory(
               "Material rechazado",
               `Admin rechazó: ${material.modelo} en ${material.ubicacion}`,
-              currentUser
+              currentUser,
             );
             alert("❌ Solicitud rechazada");
           }
@@ -1901,7 +1901,7 @@
                   fechaEtiqueta: formData.fechaEtiqueta, // ✅ AGREGADO
                   fechaRegistro: item.fechaRegistro, // ✅ Mantener la fecha original de registro
                 }
-              : item
+              : item,
           );
           setInventory(updatedInventory);
           saveToStorage("inventory-data", updatedInventory);
@@ -1909,7 +1909,7 @@
           addToHistory(
             "Material editado",
             `${currentUser.name} editó: ${formData.modelo} en ${formData.ubicacion}`,
-            currentUser
+            currentUser,
           );
           checkStockAlerts(updatedInventory);
 
@@ -1939,7 +1939,7 @@
             addToHistory(
               "Material eliminado",
               `${currentUser.name} eliminó: ${item.modelo} de ${item.ubicacion}`,
-              currentUser
+              currentUser,
             );
           }
         };
@@ -1955,7 +1955,7 @@
               addToHistory(
                 "Ajuste de cantidad",
                 `${currentUser.name} ajustó ${item.modelo} en ${item.ubicacion}: ${item.cantidad} → ${newQuantity}`,
-                currentUser
+                currentUser,
               );
               return { ...item, cantidad: newQuantity };
             }
@@ -1984,24 +1984,24 @@
 
           // Verificar stock bajo por modelo
           const lowStockModels = Object.entries(modelGroups).filter(
-            ([_, data]) => data.total <= data.stockMinimo
+            ([_, data]) => data.total <= data.stockMinimo,
           );
 
           // Verificar stock alto por modelo
           const highStockModels = Object.entries(modelGroups).filter(
-            ([_, data]) => data.total >= data.stockMaximo
+            ([_, data]) => data.total >= data.stockMaximo,
           );
 
           if (lowStockModels.length > 0 && currentUser?.role === "admin") {
             const items = lowStockModels
               .map(
                 ([modelo, data]) =>
-                  `${modelo}: ${data.total}u (Mín: ${data.stockMinimo}) en ${data.locations.length} ubicación(es)`
+                  `${modelo}: ${data.total}u (Mín: ${data.stockMinimo}) en ${data.locations.length} ubicación(es)`,
               )
               .join("\n");
             setTimeout(() => {
               alert(
-                `⚠️ ALERTA DE STOCK BAJO:\n\n${items}\n\nRevisa el dashboard para más detalles.`
+                `⚠️ ALERTA DE STOCK BAJO:\n\n${items}\n\nRevisa el dashboard para más detalles.`,
               );
             }, 500);
           }
@@ -2010,12 +2010,12 @@
             const items = highStockModels
               .map(
                 ([modelo, data]) =>
-                  `${modelo}: ${data.total}u (Máx: ${data.stockMaximo}) en ${data.locations.length} ubicación(es)`
+                  `${modelo}: ${data.total}u (Máx: ${data.stockMaximo}) en ${data.locations.length} ubicación(es)`,
               )
               .join("\n");
             setTimeout(() => {
               alert(
-                `📦 ALERTA DE STOCK ALTO:\n\n${items}\n\nExcede el stock máximo.`
+                `📦 ALERTA DE STOCK ALTO:\n\n${items}\n\nExcede el stock máximo.`,
               );
             }, 1000);
           }
@@ -2066,13 +2066,13 @@
 
           XLSX.writeFile(
             wb,
-            `inventario_${new Date().toISOString().split("T")[0]}.xlsx`
+            `inventario_${new Date().toISOString().split("T")[0]}.xlsx`,
           );
 
           addToHistory(
             "Exportación a Excel",
             `${currentUser.name} exportó el inventario`,
-            currentUser
+            currentUser,
           );
         };
 
@@ -2128,14 +2128,14 @@
               addToHistory(
                 "Importación masiva",
                 `${currentUser.name} importó ${imported} productos`,
-                currentUser
+                currentUser,
               );
               checkStockAlerts(updatedInventory);
 
               alert(
                 `✅ Importación completada:\n\n✓ ${imported} productos importados\n${
                   errors > 0 ? `✗ ${errors} filas con errores` : ""
-                }`
+                }`,
               );
             } catch (error) {
               console.error("Error:", error);
@@ -2146,137 +2146,154 @@
           e.target.value = "";
         };
 
-// Filtrado y ordenamiento avanzado del inventario
-const getFilteredAndSortedInventory = () => {
-  // Primero aplicar búsqueda general
-  let filtered = inventory.filter(
-    (item) =>
-      item.modelo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.ubicacion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.equipo &&
-        item.equipo.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+        // Filtrado y ordenamiento avanzado del inventario
+        const getFilteredAndSortedInventory = () => {
+          // Primero aplicar búsqueda general
+          let filtered = inventory.filter(
+            (item) =>
+              item.modelo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              item.ubicacion.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              (item.equipo &&
+                item.equipo.toLowerCase().includes(searchTerm.toLowerCase())),
+          );
 
-  // Aplicar filtros específicos
-  if (inventoryFilterModelo) {
-    filtered = filtered.filter((item) =>
-      item.modelo.toLowerCase().includes(inventoryFilterModelo.toLowerCase())
-    );
-  }
+          // Aplicar filtros específicos
+          if (inventoryFilterModelo) {
+            filtered = filtered.filter((item) =>
+              item.modelo
+                .toLowerCase()
+                .includes(inventoryFilterModelo.toLowerCase()),
+            );
+          }
 
-  if (inventoryFilterUbicacion) {
-    filtered = filtered.filter((item) =>
-      item.ubicacion.toLowerCase().includes(inventoryFilterUbicacion.toLowerCase())
-    );
-  }
+          if (inventoryFilterUbicacion) {
+            filtered = filtered.filter((item) =>
+              item.ubicacion
+                .toLowerCase()
+                .includes(inventoryFilterUbicacion.toLowerCase()),
+            );
+          }
 
-  if (inventoryFilterOperacion) {
-    filtered = filtered.filter((item) =>
-      item.operacionActual &&
-      item.operacionActual.toLowerCase().includes(inventoryFilterOperacion.toLowerCase())
-    );
-  }
+          if (inventoryFilterOperacion) {
+            filtered = filtered.filter(
+              (item) =>
+                item.operacionActual &&
+                item.operacionActual
+                  .toLowerCase()
+                  .includes(inventoryFilterOperacion.toLowerCase()),
+            );
+          }
 
-  if (inventoryFilterEquipo) {
-    filtered = filtered.filter((item) =>
-      item.equipo &&
-      item.equipo.toLowerCase().includes(inventoryFilterEquipo.toLowerCase())
-    );
-  }
+          if (inventoryFilterEquipo) {
+            filtered = filtered.filter(
+              (item) =>
+                item.equipo &&
+                item.equipo
+                  .toLowerCase()
+                  .includes(inventoryFilterEquipo.toLowerCase()),
+            );
+          }
 
-  // Agrupar por modelo para aplicar filtro de estado
-  const modelGroups = {};
-  filtered.forEach((item) => {
-    if (!modelGroups[item.modelo]) {
-      modelGroups[item.modelo] = {
-        items: [],
-        total: 0,
-        stockMinimo:
-          modelStockConfig[item.modelo]?.stockMinimo ||
-          parseInt(item.stockMinimo) ||
-          10,
-        stockMaximo:
-          modelStockConfig[item.modelo]?.stockMaximo ||
-          parseInt(item.stockMaximo) ||
-          100,
-      };
-    }
-    modelGroups[item.modelo].items.push(item);
-    modelGroups[item.modelo].total += parseInt(item.cantidad) || 0;
-  });
+          // Agrupar por modelo para aplicar filtro de estado
+          const modelGroups = {};
+          filtered.forEach((item) => {
+            if (!modelGroups[item.modelo]) {
+              modelGroups[item.modelo] = {
+                items: [],
+                total: 0,
+                stockMinimo:
+                  modelStockConfig[item.modelo]?.stockMinimo ||
+                  parseInt(item.stockMinimo) ||
+                  10,
+                stockMaximo:
+                  modelStockConfig[item.modelo]?.stockMaximo ||
+                  parseInt(item.stockMaximo) ||
+                  100,
+              };
+            }
+            modelGroups[item.modelo].items.push(item);
+            modelGroups[item.modelo].total += parseInt(item.cantidad) || 0;
+          });
 
-  // Filtrar por estado de stock
-  if (inventoryFilterEstado && inventoryFilterEstado !== "todos") {
-    const modelosPermitidos = new Set();
-    
-    Object.entries(modelGroups).forEach(([modelo, data]) => {
-      const isCritical = data.total <= data.stockMinimo * 0.5;
-      const isLow = data.total <= data.stockMinimo && !isCritical;
-      const isHigh = data.total >= data.stockMaximo;
-      const isOk = !isCritical && !isLow && !isHigh;
+          // Filtrar por estado de stock
+          if (inventoryFilterEstado && inventoryFilterEstado !== "todos") {
+            const modelosPermitidos = new Set();
 
-      if (
-        (inventoryFilterEstado === "critico" && isCritical) ||
-        (inventoryFilterEstado === "bajo" && isLow) ||
-        (inventoryFilterEstado === "alto" && isHigh) ||
-        (inventoryFilterEstado === "ok" && isOk)
-      ) {
-        modelosPermitidos.add(modelo);
-      }
-    });
+            Object.entries(modelGroups).forEach(([modelo, data]) => {
+              const isCritical = data.total <= data.stockMinimo * 0.5;
+              const isLow = data.total <= data.stockMinimo && !isCritical;
+              const isHigh = data.total >= data.stockMaximo;
+              const isOk = !isCritical && !isLow && !isHigh;
 
-    filtered = filtered.filter((item) => modelosPermitidos.has(item.modelo));
-  }
+              if (
+                (inventoryFilterEstado === "critico" && isCritical) ||
+                (inventoryFilterEstado === "bajo" && isLow) ||
+                (inventoryFilterEstado === "alto" && isHigh) ||
+                (inventoryFilterEstado === "ok" && isOk)
+              ) {
+                modelosPermitidos.add(modelo);
+              }
+            });
 
-  // Ordenar según criterio seleccionado
-  const sortedGroups = Object.entries(modelGroups).sort(([modeloA, dataA], [modeloB, dataB]) => {
-    let comparison = 0;
+            filtered = filtered.filter((item) =>
+              modelosPermitidos.has(item.modelo),
+            );
+          }
 
-    switch (inventorySortBy) {
-      case "cantidad":
-        comparison = dataA.total - dataB.total;
-        break;
-      case "ubicaciones":
-        comparison = dataA.items.length - dataB.items.length;
-        break;
-      case "estado":
-        // Ordenar por criticidad: crítico > bajo > alto > ok
-        const getEstadoPrioridad = (data) => {
-          const isCritical = data.total <= data.stockMinimo * 0.5;
-          const isLow = data.total <= data.stockMinimo && !isCritical;
-          const isHigh = data.total >= data.stockMaximo;
-          if (isCritical) return 4;
-          if (isLow) return 3;
-          if (isHigh) return 2;
-          return 1;
+          // Ordenar según criterio seleccionado
+          const sortedGroups = Object.entries(modelGroups).sort(
+            ([modeloA, dataA], [modeloB, dataB]) => {
+              let comparison = 0;
+
+              switch (inventorySortBy) {
+                case "cantidad":
+                  comparison = dataA.total - dataB.total;
+                  break;
+                case "ubicaciones":
+                  comparison = dataA.items.length - dataB.items.length;
+                  break;
+                case "estado":
+                  // Ordenar por criticidad: crítico > bajo > alto > ok
+                  const getEstadoPrioridad = (data) => {
+                    const isCritical = data.total <= data.stockMinimo * 0.5;
+                    const isLow = data.total <= data.stockMinimo && !isCritical;
+                    const isHigh = data.total >= data.stockMaximo;
+                    if (isCritical) return 4;
+                    if (isLow) return 3;
+                    if (isHigh) return 2;
+                    return 1;
+                  };
+                  comparison =
+                    getEstadoPrioridad(dataA) - getEstadoPrioridad(dataB);
+                  break;
+                case "modelo":
+                default:
+                  comparison = modeloA.localeCompare(modeloB);
+                  break;
+              }
+
+              return inventorySortOrder === "asc" ? comparison : -comparison;
+            },
+          );
+
+          // Reconstruir array filtrado en el orden correcto
+          const orderedFiltered = [];
+          sortedGroups.forEach(([modelo]) => {
+            const itemsDelModelo = filtered.filter(
+              (item) => item.modelo === modelo,
+            );
+            orderedFiltered.push(...itemsDelModelo);
+          });
+
+          return orderedFiltered;
         };
-        comparison = getEstadoPrioridad(dataA) - getEstadoPrioridad(dataB);
-        break;
-      case "modelo":
-      default:
-        comparison = modeloA.localeCompare(modeloB);
-        break;
-    }
 
-    return inventorySortOrder === "asc" ? comparison : -comparison;
-  });
-
-  // Reconstruir array filtrado en el orden correcto
-  const orderedFiltered = [];
-  sortedGroups.forEach(([modelo]) => {
-    const itemsDelModelo = filtered.filter((item) => item.modelo === modelo);
-    orderedFiltered.push(...itemsDelModelo);
-  });
-
-  return orderedFiltered;
-};
-
-const filteredInventory = getFilteredAndSortedInventory();
+        const filteredInventory = getFilteredAndSortedInventory();
 
         const getLowStockItems = () => {
           return inventory.filter(
             (item) =>
-              parseInt(item.cantidad) <= (parseInt(item.stockMinimo) || 10)
+              parseInt(item.cantidad) <= (parseInt(item.stockMinimo) || 10),
           );
         };
 
@@ -2284,7 +2301,7 @@ const filteredInventory = getFilteredAndSortedInventory();
           return inventory.filter(
             (item) =>
               parseInt(item.cantidad) <=
-              (parseInt(item.stockMinimo) || 10) * 0.5
+              (parseInt(item.stockMinimo) || 10) * 0.5,
           );
         };
 
@@ -2292,7 +2309,7 @@ const filteredInventory = getFilteredAndSortedInventory();
           const totalRecords = inventory.length;
           const totalQuantity = inventory.reduce(
             (sum, item) => sum + parseInt(item.cantidad),
-            0
+            0,
           );
           const lowStock = getLowStockItems().length;
           const critical = getCriticalStockItems().length;
@@ -2316,7 +2333,7 @@ const filteredInventory = getFilteredAndSortedInventory();
         // Obtener número de semana del año
         const getWeekNumber = (date) => {
           const d = new Date(
-            Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+            Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
           );
           const dayNum = d.getUTCDay() || 7;
           d.setUTCDate(d.getUTCDate() + 4 - dayNum);
@@ -2460,7 +2477,7 @@ const filteredInventory = getFilteredAndSortedInventory();
                     .includes(item.modelo.toLowerCase()) &&
                   entry.details
                     .toLowerCase()
-                    .includes(item.ubicacion.toLowerCase())
+                    .includes(item.ubicacion.toLowerCase()),
               );
               dateToUse =
                 addEntry && addEntry.date
@@ -2497,7 +2514,7 @@ const filteredInventory = getFilteredAndSortedInventory();
                 break;
               case "month":
                 key = `${dateToUse.getFullYear()}-${String(
-                  dateToUse.getMonth() + 1
+                  dateToUse.getMonth() + 1,
                 ).padStart(2, "0")}`;
                 display = dateToUse.toLocaleDateString("es-MX", {
                   month: "long",
@@ -2598,7 +2615,7 @@ const filteredInventory = getFilteredAndSortedInventory();
                       .includes(item.modelo.toLowerCase()) &&
                     entry.details
                       .toLowerCase()
-                      .includes(item.ubicacion.toLowerCase())
+                      .includes(item.ubicacion.toLowerCase()),
                 );
                 dateToUse =
                   addEntry && addEntry.date
@@ -2621,7 +2638,7 @@ const filteredInventory = getFilteredAndSortedInventory();
                 case "month":
                   belongsToPeriod =
                     `${dateToUse.getFullYear()}-${String(
-                      dateToUse.getMonth() + 1
+                      dateToUse.getMonth() + 1,
                     ).padStart(2, "0")}` === period.key;
                   break;
                 case "year":
@@ -2818,7 +2835,7 @@ const filteredInventory = getFilteredAndSortedInventory();
 
           const items = inventory.filter(
             (item) =>
-              item.modelo.toLowerCase().trim() === modelo.toLowerCase().trim()
+              item.modelo.toLowerCase().trim() === modelo.toLowerCase().trim(),
           );
 
           if (items.length === 0) return [];
@@ -2852,24 +2869,26 @@ const filteredInventory = getFilteredAndSortedInventory();
           const today = new Date(
             now.getFullYear(),
             now.getMonth(),
-            now.getDate()
+            now.getDate(),
           );
 
           const materialsWithActivity = inventory.map((item) => {
             // Buscar última actividad de este item en el historial
-          const lastActivity = changeHistory
-  .filter(entry => {
-    if (!entry || !entry.details || !entry.action) return false;
-    const details = String(entry.details).toLowerCase();
-    const modelo = String(item.modelo).toLowerCase();
-    const ubicacion = String(item.ubicacion).toLowerCase();
-    
-    return details.includes(modelo) &&
-      (details.includes(ubicacion) ||
-        entry.action.includes('ajustó') ||
-        entry.action.includes('editado') ||
-        entry.action.includes('agregó'));
-  })
+            const lastActivity = changeHistory
+              .filter((entry) => {
+                if (!entry || !entry.details || !entry.action) return false;
+                const details = String(entry.details).toLowerCase();
+                const modelo = String(item.modelo).toLowerCase();
+                const ubicacion = String(item.ubicacion).toLowerCase();
+
+                return (
+                  details.includes(modelo) &&
+                  (details.includes(ubicacion) ||
+                    entry.action.includes("ajustó") ||
+                    entry.action.includes("editado") ||
+                    entry.action.includes("agregó"))
+                );
+              })
               .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
 
             // Determinar fecha de última actividad
@@ -2881,7 +2900,7 @@ const filteredInventory = getFilteredAndSortedInventory();
               lastActivityDate = new Date(
                 actDate.getFullYear(),
                 actDate.getMonth(),
-                actDate.getDate()
+                actDate.getDate(),
               );
             } else if (item.fechaRegistro) {
               // Usar fecha de registro del item
@@ -2889,7 +2908,7 @@ const filteredInventory = getFilteredAndSortedInventory();
               lastActivityDate = new Date(
                 regDate.getFullYear(),
                 regDate.getMonth(),
-                regDate.getDate()
+                regDate.getDate(),
               );
             } else {
               // Si no hay fecha, usar hoy (material sin fecha)
@@ -2900,7 +2919,7 @@ const filteredInventory = getFilteredAndSortedInventory();
             const millisDiff = today.getTime() - lastActivityDate.getTime();
             const daysSinceActivity = Math.max(
               0,
-              Math.floor(millisDiff / (1000 * 60 * 60 * 24))
+              Math.floor(millisDiff / (1000 * 60 * 60 * 24)),
             );
 
             return {
@@ -2922,16 +2941,16 @@ const filteredInventory = getFilteredAndSortedInventory();
               connectionStatus === "connected"
                 ? "bg-green-900/30 text-green-400 border border-green-500"
                 : connectionStatus === "local"
-                ? "bg-yellow-900/30 text-yellow-400 border border-yellow-500"
-                : "bg-red-900/30 text-red-400 border border-red-500"
+                  ? "bg-yellow-900/30 text-yellow-400 border border-yellow-500"
+                  : "bg-red-900/30 text-red-400 border border-red-500"
             }`}
           >
             {connectionStatus === "connected" ? <Cloud /> : <CloudOff />}
             {connectionStatus === "connected"
               ? "Sincronizado"
               : connectionStatus === "local"
-              ? "Modo Local"
-              : "Sin conexión"}
+                ? "Modo Local"
+                : "Sin conexión"}
           </div>
         );
 
@@ -3401,7 +3420,7 @@ const filteredInventory = getFilteredAndSortedInventory();
                                   <Trash2 className="w-4 h-4" />
                                 </button>
                               </div>
-                            )
+                            ),
                           )}
                         </div>
                         <div className="flex gap-2">
@@ -3461,7 +3480,7 @@ const filteredInventory = getFilteredAndSortedInventory();
                                   <Trash2 className="w-4 h-4" />
                                 </button>
                               </div>
-                            )
+                            ),
                           )}
                         </div>
                         <div className="flex gap-2">
@@ -3736,7 +3755,7 @@ const filteredInventory = getFilteredAndSortedInventory();
                     });
 
                     const lowStockModels = Object.entries(modelGroups).filter(
-                      ([_, data]) => data.total <= data.stockMinimo
+                      ([_, data]) => data.total <= data.stockMinimo,
                     );
 
                     return (
@@ -3837,7 +3856,7 @@ const filteredInventory = getFilteredAndSortedInventory();
                     });
 
                     const highStockModels = Object.entries(modelGroups).filter(
-                      ([_, data]) => data.total >= data.stockMaximo
+                      ([_, data]) => data.total >= data.stockMaximo,
                     );
 
                     return (
@@ -3912,7 +3931,7 @@ const filteredInventory = getFilteredAndSortedInventory();
                         {[...inventory]
                           .sort(
                             (a, b) =>
-                              parseInt(b.cantidad) - parseInt(a.cantidad)
+                              parseInt(b.cantidad) - parseInt(a.cantidad),
                           )
                           .slice(0, 5)
                           .map((item, i) => (
@@ -3956,13 +3975,13 @@ const filteredInventory = getFilteredAndSortedInventory();
                           .slice(0, 5)
                           .map((loc, i) => {
                             const count = inventory.filter(
-                              (item) => item.ubicacion === loc
+                              (item) => item.ubicacion === loc,
                             ).length;
                             const totalQty = inventory
                               .filter((item) => item.ubicacion === loc)
                               .reduce(
                                 (sum, item) => sum + parseInt(item.cantidad),
-                                0
+                                0,
                               );
                             return (
                               <div
@@ -4030,14 +4049,16 @@ const filteredInventory = getFilteredAndSortedInventory();
                         <div className="space-y-3">
                           {getUserActivity("month").map((user, i) => {
                             const maxActivity = Math.max(
-                              ...getUserActivity("month").map((u) => u.total)
+                              ...getUserActivity("month").map((u) => u.total),
                             );
                             const barWidth = (user.total / maxActivity) * 100;
                             return (
                               <div key={i}>
                                 <div className="flex items-center justify-between mb-1">
                                   <span className="text-sm text-slate-300">
-                                    {user.name}
+                                    {String(
+                                      user.name || user.email || "Usuario",
+                                    )}
                                   </span>
                                   <span className="text-sm font-bold text-white">
                                     {user.total}
@@ -4091,7 +4112,9 @@ const filteredInventory = getFilteredAndSortedInventory();
                                   className="border-b border-slate-700/50"
                                 >
                                   <td className="py-2 text-white">
-                                    {user.name}
+                                    {String(
+                                      user.name || user.email || "Usuario",
+                                    )}
                                   </td>
                                   <td className="text-center text-green-400 font-semibold">
                                     {user.entries}
@@ -4134,8 +4157,8 @@ const filteredInventory = getFilteredAndSortedInventory();
                               item.daysSinceActivity > 30
                                 ? "border-red-500"
                                 : item.daysSinceActivity > 15
-                                ? "border-yellow-500"
-                                : "border-slate-700"
+                                  ? "border-yellow-500"
+                                  : "border-slate-700"
                             }`}
                           >
                             <div className="flex items-start justify-between">
@@ -4156,8 +4179,8 @@ const filteredInventory = getFilteredAndSortedInventory();
                                     item.daysSinceActivity > 30
                                       ? "text-red-400"
                                       : item.daysSinceActivity > 15
-                                      ? "text-yellow-400"
-                                      : "text-slate-400"
+                                        ? "text-yellow-400"
+                                        : "text-slate-400"
                                   }`}
                                 >
                                   {item.daysSinceActivity}
@@ -4221,7 +4244,7 @@ const filteredInventory = getFilteredAndSortedInventory();
                         console.log("📦 Inventario completo:", inventory);
                         console.log(
                           "🔄 Flujo encontrado:",
-                          getProcessFlow(processFlowSearch)
+                          getProcessFlow(processFlowSearch),
                         );
                         const modelos = [
                           ...new Set(inventory.map((i) => i.modelo)),
@@ -4230,7 +4253,7 @@ const filteredInventory = getFilteredAndSortedInventory();
                           ...new Set(
                             inventory
                               .filter((i) => i.operacionActual)
-                              .map((i) => i.modelo)
+                              .map((i) => i.modelo),
                           ),
                         ];
                         alert(
@@ -4238,7 +4261,7 @@ const filteredInventory = getFilteredAndSortedInventory();
                             modelos.length
                           }\n✅ Con operaciones: ${
                             modelosConOp.length
-                          }\n\nModelos: ${modelos.join(", ")}`
+                          }\n\nModelos: ${modelos.join(", ")}`,
                         );
                       }}
                       className="mt-2 px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-semibold"
@@ -4312,7 +4335,7 @@ const filteredInventory = getFilteredAndSortedInventory();
                                     ...new Set(
                                       inventory
                                         .filter((i) => i.operacionActual)
-                                        .map((i) => i.modelo)
+                                        .map((i) => i.modelo),
                                     ),
                                   ]
                                     .slice(0, 10)
@@ -4581,10 +4604,10 @@ const filteredInventory = getFilteredAndSortedInventory();
                         {dateRangeType === "day"
                           ? "🌞 Diario"
                           : dateRangeType === "week"
-                          ? "📆 Semanal"
-                          : dateRangeType === "month"
-                          ? "🗓️ Mensual"
-                          : "📊 Anual"}
+                            ? "📆 Semanal"
+                            : dateRangeType === "month"
+                              ? "🗓️ Mensual"
+                              : "📊 Anual"}
                       </span>
                       <span className="bg-green-500/20 px-3 py-1 rounded-full text-green-300">
                         {dateFieldType === "registro"
@@ -4595,10 +4618,10 @@ const filteredInventory = getFilteredAndSortedInventory();
                         {chartViewType === "bar"
                           ? "📊 Barras"
                           : chartViewType === "line"
-                          ? "📈 Líneas"
-                          : chartViewType === "area"
-                          ? "🏔️ Área"
-                          : "📋 Tabla"}
+                            ? "📈 Líneas"
+                            : chartViewType === "area"
+                              ? "🏔️ Área"
+                              : "📋 Tabla"}
                       </span>
                     </div>
                   </div>
@@ -4669,326 +4692,477 @@ const filteredInventory = getFilteredAndSortedInventory();
 
                       const maxValue = Math.max(
                         ...data.map((p) => p.totalQuantity),
-                        1
+                        1,
                       );
 
- // GRÁFICA DE BARRAS CON SCROLL HORIZONTAL
-if (chartViewType === "bar") {
-  return (
-    <div>
-      {/* Contenedor con scroll horizontal */}
-      <div className="overflow-x-auto pb-4">
-        <div 
-          className="relative h-80 flex items-end justify-center"
-          style={{ minWidth: `${Math.max(data.slice(0, 20).length * 60, 100)}px` }}
-        >
-          {data
-            .slice(0, 20)
-            .reverse()
-            .map((period, i) => {
-              const height = (period.totalQuantity / maxValue) * 100;
-              const isRecent = i >= data.slice(0, 20).length - 3;
-
-              return (
-                <div
-                  key={period.key}
-                  className="flex flex-col items-center justify-end h-full group"
-                  style={{ minWidth: '50px', flex: '0 0 auto' }}
-                >
-                  <div className="text-center mb-1 opacity-0 group-hover:opacity-100 transition">
-                    <p className="text-xs font-bold text-white bg-slate-900 px-2 py-1 rounded whitespace-nowrap">
-                      {period.totalQuantity}
-                    </p>
-                  </div>
-                  <div
-                    className={`w-full rounded-t transition-all duration-300 ${
-                      isRecent ? "bg-green-500" : "bg-blue-500"
-                    } hover:opacity-80`}
-                    style={{ height: `${Math.max(height, 2)}%` }}
-                    title={`${period.display}: ${period.totalQuantity}`}
-                  ></div>
-                  <p className="text-xs text-slate-400 mt-1 truncate max-w-full transform rotate-45 origin-left whitespace-nowrap">
-                    {period.display.slice(0, 10)}
-                  </p>
-                </div>
-              );
-            })}
-        </div>
-      </div>
-
-      {/* Estadísticas */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-4 border-t border-slate-700">
-        <div className="text-center bg-blue-900/20 p-3 rounded">
-          <p className="text-2xl font-bold text-white">{data.length}</p>
-          <p className="text-xs text-slate-400">Períodos</p>
-        </div>
-        <div className="text-center bg-green-900/20 p-3 rounded">
-          <p className="text-2xl font-bold text-green-400">
-            {data.reduce((s, p) => s + p.totalQuantity, 0).toLocaleString()}
-          </p>
-          <p className="text-xs text-slate-400">Total</p>
-        </div>
-        <div className="text-center bg-purple-900/20 p-3 rounded">
-          <p className="text-2xl font-bold text-purple-400">
-            {Math.round(data.reduce((s, p) => s + p.totalQuantity, 0) / data.length)}
-          </p>
-          <p className="text-xs text-slate-400">Promedio</p>
-        </div>
-        <div className="text-center bg-yellow-900/20 p-3 rounded">
-          <p className="text-2xl font-bold text-yellow-400">
-            {Math.max(...data.map((p) => p.totalQuantity))}
-          </p>
-          <p className="text-xs text-slate-400">Máximo</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-           // GRÁFICA DE LÍNEAS CON RESPONSIVE
-if (chartViewType === "line") {
-  return (
-    <div className="overflow-x-auto">
-      <svg
-        width="100%"
-        height="300"
-        viewBox="0 0 800 300"
-        className="min-w-[600px]"
-      >
-        {data
-          .slice(0, 15)
-          .reverse()
-          .map((p, i, arr) => {
-            const x1 = 50 + (i / (arr.length - 1)) * 700;
-            const y1 = 250 - (p.totalQuantity / maxValue) * 200;
-            const x2 =
-              i < arr.length - 1
-                ? 50 + ((i + 1) / (arr.length - 1)) * 700
-                : x1;
-            const y2 =
-              i < arr.length - 1
-                ? 250 - (arr[i + 1].totalQuantity / maxValue) * 200
-                : y1;
-
-            return (
-              <g key={i}>
-                {i < arr.length - 1 && (
-                  <line
-                    x1={x1}
-                    y1={y1}
-                    x2={x2}
-                    y2={y2}
-                    stroke="#3b82f6"
-                    strokeWidth="3"
-                  />
-                )}
-                <circle cx={x1} cy={y1} r="5" fill="#3b82f6" />
-                <text x={x1} y={y1 - 10} textAnchor="middle" fill="#fff" fontSize="10">
-                  {p.totalQuantity}
-                </text>
-                <title>{p.display}: {p.totalQuantity}</title>
-              </g>
-            );
-          })}
-      </svg>
-      <p className="text-center text-slate-400 mt-4">
-        Total: {data.reduce((s, p) => s + p.totalQuantity, 0).toLocaleString()}
-      </p>
-    </div>
-  );
-}
-
-                     // GRÁFICA DE ÁREA CON RESPONSIVE
-if (chartViewType === "area") {
-  const points = data.slice(0, 15).reverse();
-  const pathData = points
-    .map((p, i) => {
-      const x = 50 + (i / (points.length - 1)) * 700;
-      const y = 250 - (p.totalQuantity / maxValue) * 200;
-      return `${i === 0 ? "M" : "L"} ${x} ${y}`;
-    })
-    .join(" ");
-
-  return (
-    <div className="overflow-x-auto">
-      <svg width="100%" height="300" viewBox="0 0 800 300" className="min-w-[600px]">
-        <defs>
-          <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="rgba(59, 130, 246, 0.5)" />
-            <stop offset="100%" stopColor="rgba(59, 130, 246, 0.1)" />
-          </linearGradient>
-        </defs>
-        <path
-          d={`${pathData} L 750 250 L 50 250 Z`}
-          fill="url(#areaGradient)"
-        />
-        <path d={pathData} fill="none" stroke="#3b82f6" strokeWidth="3" />
-        {points.map((p, i) => {
-          const x = 50 + (i / (points.length - 1)) * 700;
-          const y = 250 - (p.totalQuantity / maxValue) * 200;
-          return (
-            <g key={i}>
-              <circle cx={x} cy={y} r="4" fill="#3b82f6" />
-              <title>{p.display}: {p.totalQuantity}</title>
-            </g>
-          );
-        })}
-      </svg>
-      <p className="text-center text-slate-400 mt-4">
-        Total: {data.reduce((s, p) => s + p.totalQuantity, 0).toLocaleString()}
-      </p>
-    </div>
-  );
-}
-
-// TABLA CON DESGLOSE POR MODELOS
-return (
-  <div className="space-y-6">
-    {/* Tabla principal con scroll horizontal para móviles */}
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm min-w-[600px]">
-        <thead className="bg-slate-800 sticky top-0">
-          <tr>
-            <th className="p-3 text-left text-slate-300">Período</th>
-            <th className="p-3 text-right text-slate-300">Cantidad Total</th>
-            <th className="p-3 text-right text-slate-300">Items</th>
-            <th className="p-3 text-right text-slate-300">Modelos Únicos</th>
-            <th className="p-3 text-center text-slate-300">Acción</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.slice(0, 15).map((p, idx) => (
-            <React.Fragment key={p.key}>
-              <tr className="border-b border-slate-700 hover:bg-slate-800/50">
-                <td className="p-3 text-white font-semibold">{p.display}</td>
-                <td className="p-3 text-right text-green-400 font-bold text-lg">
-                  {p.totalQuantity.toLocaleString()}
-                </td>
-                <td className="p-3 text-right text-slate-400">{p.itemCount}</td>
-                <td className="p-3 text-right text-blue-400">
-                  {Object.keys(p.models).length}
-                </td>
-                <td className="p-3 text-center">
-                  <button
-                    onClick={() => {
-                      const detailId = `detail-${p.key}`;
-                      const detailRow = document.getElementById(detailId);
-                      if (detailRow) {
-                        detailRow.style.display = 
-                          detailRow.style.display === 'none' ? 'table-row' : 'none';
-                      }
-                    }}
-                    className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-semibold"
-                  >
-                    📊 Ver Detalle
-                  </button>
-                </td>
-              </tr>
-              
-              {/* Fila expandible con desglose por modelo */}
-              <tr id={`detail-${p.key}`} style={{ display: 'none' }} className="bg-slate-900/70">
-                <td colSpan="5" className="p-4">
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-bold text-blue-300 mb-3">
-                      📦 Desglose por Modelo - {p.display}
-                    </h4>
-                    
-                    {/* Grid responsive para modelos */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {Object.entries(p.models)
-                        .sort(([, a], [, b]) => b - a)
-                        .map(([modelo, cantidad]) => (
-                          <div 
-                            key={modelo} 
-                            className="bg-slate-800/50 p-3 rounded-lg border border-slate-700"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-white font-medium text-sm truncate flex-1">
-                                {modelo}
-                              </span>
-                              <span className="text-green-400 font-bold text-lg ml-2">
-                                {cantidad}
-                              </span>
-                            </div>
-                            <div className="mt-2 w-full bg-slate-700 rounded-full h-2">
+                      // GRÁFICA DE BARRAS CON SCROLL HORIZONTAL
+                      if (chartViewType === "bar") {
+                        return (
+                          <div>
+                            {/* Contenedor con scroll horizontal */}
+                            <div className="overflow-x-auto pb-4">
                               <div
-                                className="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all"
-                                style={{ width: `${(cantidad / p.totalQuantity) * 100}%` }}
-                              ></div>
+                                className="relative h-80 flex items-end justify-center"
+                                style={{
+                                  minWidth: `${Math.max(data.slice(0, 20).length * 60, 100)}px`,
+                                }}
+                              >
+                                {data
+                                  .slice(0, 20)
+                                  .reverse()
+                                  .map((period, i) => {
+                                    const height =
+                                      (period.totalQuantity / maxValue) * 100;
+                                    const isRecent =
+                                      i >= data.slice(0, 20).length - 3;
+
+                                    return (
+                                      <div
+                                        key={period.key}
+                                        className="flex flex-col items-center justify-end h-full group"
+                                        style={{
+                                          minWidth: "50px",
+                                          flex: "0 0 auto",
+                                        }}
+                                      >
+                                        <div className="text-center mb-1 opacity-0 group-hover:opacity-100 transition">
+                                          <p className="text-xs font-bold text-white bg-slate-900 px-2 py-1 rounded whitespace-nowrap">
+                                            {period.totalQuantity}
+                                          </p>
+                                        </div>
+                                        <div
+                                          className={`w-full rounded-t transition-all duration-300 ${
+                                            isRecent
+                                              ? "bg-green-500"
+                                              : "bg-blue-500"
+                                          } hover:opacity-80`}
+                                          style={{
+                                            height: `${Math.max(height, 2)}%`,
+                                          }}
+                                          title={`${period.display}: ${period.totalQuantity}`}
+                                        ></div>
+                                        <p className="text-xs text-slate-400 mt-1 truncate max-w-full transform rotate-45 origin-left whitespace-nowrap">
+                                          {period.display.slice(0, 10)}
+                                        </p>
+                                      </div>
+                                    );
+                                  })}
+                              </div>
                             </div>
-                            <p className="text-xs text-slate-400 mt-1">
-                              {((cantidad / p.totalQuantity) * 100).toFixed(1)}% del total
+
+                            {/* Estadísticas */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-4 border-t border-slate-700">
+                              <div className="text-center bg-blue-900/20 p-3 rounded">
+                                <p className="text-2xl font-bold text-white">
+                                  {data.length}
+                                </p>
+                                <p className="text-xs text-slate-400">
+                                  Períodos
+                                </p>
+                              </div>
+                              <div className="text-center bg-green-900/20 p-3 rounded">
+                                <p className="text-2xl font-bold text-green-400">
+                                  {data
+                                    .reduce((s, p) => s + p.totalQuantity, 0)
+                                    .toLocaleString()}
+                                </p>
+                                <p className="text-xs text-slate-400">Total</p>
+                              </div>
+                              <div className="text-center bg-purple-900/20 p-3 rounded">
+                                <p className="text-2xl font-bold text-purple-400">
+                                  {Math.round(
+                                    data.reduce(
+                                      (s, p) => s + p.totalQuantity,
+                                      0,
+                                    ) / data.length,
+                                  )}
+                                </p>
+                                <p className="text-xs text-slate-400">
+                                  Promedio
+                                </p>
+                              </div>
+                              <div className="text-center bg-yellow-900/20 p-3 rounded">
+                                <p className="text-2xl font-bold text-yellow-400">
+                                  {Math.max(
+                                    ...data.map((p) => p.totalQuantity),
+                                  )}
+                                </p>
+                                <p className="text-xs text-slate-400">Máximo</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // GRÁFICA DE LÍNEAS CON RESPONSIVE
+                      if (chartViewType === "line") {
+                        return (
+                          <div className="overflow-x-auto">
+                            <svg
+                              width="100%"
+                              height="300"
+                              viewBox="0 0 800 300"
+                              className="min-w-[600px]"
+                            >
+                              {data
+                                .slice(0, 15)
+                                .reverse()
+                                .map((p, i, arr) => {
+                                  const x1 = 50 + (i / (arr.length - 1)) * 700;
+                                  const y1 =
+                                    250 - (p.totalQuantity / maxValue) * 200;
+                                  const x2 =
+                                    i < arr.length - 1
+                                      ? 50 + ((i + 1) / (arr.length - 1)) * 700
+                                      : x1;
+                                  const y2 =
+                                    i < arr.length - 1
+                                      ? 250 -
+                                        (arr[i + 1].totalQuantity / maxValue) *
+                                          200
+                                      : y1;
+
+                                  return (
+                                    <g key={i}>
+                                      {i < arr.length - 1 && (
+                                        <line
+                                          x1={x1}
+                                          y1={y1}
+                                          x2={x2}
+                                          y2={y2}
+                                          stroke="#3b82f6"
+                                          strokeWidth="3"
+                                        />
+                                      )}
+                                      <circle
+                                        cx={x1}
+                                        cy={y1}
+                                        r="5"
+                                        fill="#3b82f6"
+                                      />
+                                      <text
+                                        x={x1}
+                                        y={y1 - 10}
+                                        textAnchor="middle"
+                                        fill="#fff"
+                                        fontSize="10"
+                                      >
+                                        {p.totalQuantity}
+                                      </text>
+                                      <title>
+                                        {p.display}: {p.totalQuantity}
+                                      </title>
+                                    </g>
+                                  );
+                                })}
+                            </svg>
+                            <p className="text-center text-slate-400 mt-4">
+                              Total:{" "}
+                              {data
+                                .reduce((s, p) => s + p.totalQuantity, 0)
+                                .toLocaleString()}
                             </p>
                           </div>
-                        ))}
-                    </div>
+                        );
+                      }
 
-                    {/* Resumen adicional */}
-                    <div className="mt-4 pt-3 border-t border-slate-700 grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <div className="bg-blue-900/20 p-2 rounded text-center">
-                        <p className="text-xs text-blue-300">Operaciones</p>
-                        <p className="text-sm font-bold text-white">
-                          {Object.keys(p.byOperation).length}
-                        </p>
-                      </div>
-                      <div className="bg-purple-900/20 p-2 rounded text-center">
-                        <p className="text-xs text-purple-300">Ubicaciones</p>
-                        <p className="text-sm font-bold text-white">
-                          {Object.keys(p.byLocation).length}
-                        </p>
-                      </div>
-                      <div className="bg-green-900/20 p-2 rounded text-center">
-                        <p className="text-xs text-green-300">Equipos</p>
-                        <p className="text-sm font-bold text-white">
-                          {Object.keys(p.byEquipo).length || 0}
-                        </p>
-                      </div>
-                      <div className="bg-yellow-900/20 p-2 rounded text-center">
-                        <p className="text-xs text-yellow-300">Modelo Top</p>
-                        <p className="text-sm font-bold text-white truncate">
-                          {Object.entries(p.models).sort(([, a], [, b]) => b - a)[0]?.[0] || 'N/A'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            </React.Fragment>
-          ))}
-        </tbody>
-      </table>
-    </div>
+                      // GRÁFICA DE ÁREA CON RESPONSIVE
+                      if (chartViewType === "area") {
+                        const points = data.slice(0, 15).reverse();
+                        const pathData = points
+                          .map((p, i) => {
+                            const x = 50 + (i / (points.length - 1)) * 700;
+                            const y = 250 - (p.totalQuantity / maxValue) * 200;
+                            return `${i === 0 ? "M" : "L"} ${x} ${y}`;
+                          })
+                          .join(" ");
 
-    {/* Resumen global */}
-    <div className="mt-6 p-4 bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-lg border border-blue-500/50">
-      <h4 className="text-white font-bold mb-3">📈 Resumen Global</h4>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="text-center">
-          <p className="text-2xl font-bold text-white">{data.length}</p>
-          <p className="text-xs text-slate-400">Períodos Analizados</p>
-        </div>
-        <div className="text-center">
-          <p className="text-2xl font-bold text-green-400">
-            {data.reduce((s, p) => s + p.totalQuantity, 0).toLocaleString()}
-          </p>
-          <p className="text-xs text-slate-400">Cantidad Total</p>
-        </div>
-        <div className="text-center">
-          <p className="text-2xl font-bold text-blue-400">
-            {[...new Set(data.flatMap(p => Object.keys(p.models)))].length}
-          </p>
-          <p className="text-xs text-slate-400">Modelos Únicos</p>
-        </div>
-        <div className="text-center">
-          <p className="text-2xl font-bold text-purple-400">
-            {Math.round(data.reduce((s, p) => s + p.totalQuantity, 0) / data.length)}
-          </p>
-          <p className="text-xs text-slate-400">Promedio/Período</p>
-        </div>
-      </div>
-    </div>
-  </div>
-);
+                        return (
+                          <div className="overflow-x-auto">
+                            <svg
+                              width="100%"
+                              height="300"
+                              viewBox="0 0 800 300"
+                              className="min-w-[600px]"
+                            >
+                              <defs>
+                                <linearGradient
+                                  id="areaGradient"
+                                  x1="0%"
+                                  y1="0%"
+                                  x2="0%"
+                                  y2="100%"
+                                >
+                                  <stop
+                                    offset="0%"
+                                    stopColor="rgba(59, 130, 246, 0.5)"
+                                  />
+                                  <stop
+                                    offset="100%"
+                                    stopColor="rgba(59, 130, 246, 0.1)"
+                                  />
+                                </linearGradient>
+                              </defs>
+                              <path
+                                d={`${pathData} L 750 250 L 50 250 Z`}
+                                fill="url(#areaGradient)"
+                              />
+                              <path
+                                d={pathData}
+                                fill="none"
+                                stroke="#3b82f6"
+                                strokeWidth="3"
+                              />
+                              {points.map((p, i) => {
+                                const x = 50 + (i / (points.length - 1)) * 700;
+                                const y =
+                                  250 - (p.totalQuantity / maxValue) * 200;
+                                return (
+                                  <g key={i}>
+                                    <circle
+                                      cx={x}
+                                      cy={y}
+                                      r="4"
+                                      fill="#3b82f6"
+                                    />
+                                    <title>
+                                      {p.display}: {p.totalQuantity}
+                                    </title>
+                                  </g>
+                                );
+                              })}
+                            </svg>
+                            <p className="text-center text-slate-400 mt-4">
+                              Total:{" "}
+                              {data
+                                .reduce((s, p) => s + p.totalQuantity, 0)
+                                .toLocaleString()}
+                            </p>
+                          </div>
+                        );
+                      }
+
+                      // TABLA CON DESGLOSE POR MODELOS
+                      return (
+                        <div className="space-y-6">
+                          {/* Tabla principal con scroll horizontal para móviles */}
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm min-w-[600px]">
+                              <thead className="bg-slate-800 sticky top-0">
+                                <tr>
+                                  <th className="p-3 text-left text-slate-300">
+                                    Período
+                                  </th>
+                                  <th className="p-3 text-right text-slate-300">
+                                    Cantidad Total
+                                  </th>
+                                  <th className="p-3 text-right text-slate-300">
+                                    Items
+                                  </th>
+                                  <th className="p-3 text-right text-slate-300">
+                                    Modelos Únicos
+                                  </th>
+                                  <th className="p-3 text-center text-slate-300">
+                                    Acción
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {data.slice(0, 15).map((p, idx) => (
+                                  <React.Fragment key={p.key}>
+                                    <tr className="border-b border-slate-700 hover:bg-slate-800/50">
+                                      <td className="p-3 text-white font-semibold">
+                                        {p.display}
+                                      </td>
+                                      <td className="p-3 text-right text-green-400 font-bold text-lg">
+                                        {p.totalQuantity.toLocaleString()}
+                                      </td>
+                                      <td className="p-3 text-right text-slate-400">
+                                        {p.itemCount}
+                                      </td>
+                                      <td className="p-3 text-right text-blue-400">
+                                        {Object.keys(p.models).length}
+                                      </td>
+                                      <td className="p-3 text-center">
+                                        <button
+                                          onClick={() => {
+                                            const detailId = `detail-${p.key}`;
+                                            const detailRow =
+                                              document.getElementById(detailId);
+                                            if (detailRow) {
+                                              detailRow.style.display =
+                                                detailRow.style.display ===
+                                                "none"
+                                                  ? "table-row"
+                                                  : "none";
+                                            }
+                                          }}
+                                          className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-semibold"
+                                        >
+                                          📊 Ver Detalle
+                                        </button>
+                                      </td>
+                                    </tr>
+
+                                    {/* Fila expandible con desglose por modelo */}
+                                    <tr
+                                      id={`detail-${p.key}`}
+                                      style={{ display: "none" }}
+                                      className="bg-slate-900/70"
+                                    >
+                                      <td colSpan="5" className="p-4">
+                                        <div className="space-y-3">
+                                          <h4 className="text-sm font-bold text-blue-300 mb-3">
+                                            📦 Desglose por Modelo - {p.display}
+                                          </h4>
+
+                                          {/* Grid responsive para modelos */}
+                                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                            {Object.entries(p.models)
+                                              .sort(([, a], [, b]) => b - a)
+                                              .map(([modelo, cantidad]) => (
+                                                <div
+                                                  key={modelo}
+                                                  className="bg-slate-800/50 p-3 rounded-lg border border-slate-700"
+                                                >
+                                                  <div className="flex items-center justify-between">
+                                                    <span className="text-white font-medium text-sm truncate flex-1">
+                                                      {modelo}
+                                                    </span>
+                                                    <span className="text-green-400 font-bold text-lg ml-2">
+                                                      {cantidad}
+                                                    </span>
+                                                  </div>
+                                                  <div className="mt-2 w-full bg-slate-700 rounded-full h-2">
+                                                    <div
+                                                      className="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all"
+                                                      style={{
+                                                        width: `${(cantidad / p.totalQuantity) * 100}%`,
+                                                      }}
+                                                    ></div>
+                                                  </div>
+                                                  <p className="text-xs text-slate-400 mt-1">
+                                                    {(
+                                                      (cantidad /
+                                                        p.totalQuantity) *
+                                                      100
+                                                    ).toFixed(1)}
+                                                    % del total
+                                                  </p>
+                                                </div>
+                                              ))}
+                                          </div>
+
+                                          {/* Resumen adicional */}
+                                          <div className="mt-4 pt-3 border-t border-slate-700 grid grid-cols-2 md:grid-cols-4 gap-3">
+                                            <div className="bg-blue-900/20 p-2 rounded text-center">
+                                              <p className="text-xs text-blue-300">
+                                                Operaciones
+                                              </p>
+                                              <p className="text-sm font-bold text-white">
+                                                {
+                                                  Object.keys(p.byOperation)
+                                                    .length
+                                                }
+                                              </p>
+                                            </div>
+                                            <div className="bg-purple-900/20 p-2 rounded text-center">
+                                              <p className="text-xs text-purple-300">
+                                                Ubicaciones
+                                              </p>
+                                              <p className="text-sm font-bold text-white">
+                                                {
+                                                  Object.keys(p.byLocation)
+                                                    .length
+                                                }
+                                              </p>
+                                            </div>
+                                            <div className="bg-green-900/20 p-2 rounded text-center">
+                                              <p className="text-xs text-green-300">
+                                                Equipos
+                                              </p>
+                                              <p className="text-sm font-bold text-white">
+                                                {Object.keys(p.byEquipo)
+                                                  .length || 0}
+                                              </p>
+                                            </div>
+                                            <div className="bg-yellow-900/20 p-2 rounded text-center">
+                                              <p className="text-xs text-yellow-300">
+                                                Modelo Top
+                                              </p>
+                                              <p className="text-sm font-bold text-white truncate">
+                                                {Object.entries(p.models).sort(
+                                                  ([, a], [, b]) => b - a,
+                                                )[0]?.[0] || "N/A"}
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  </React.Fragment>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Resumen global */}
+                          <div className="mt-6 p-4 bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-lg border border-blue-500/50">
+                            <h4 className="text-white font-bold mb-3">
+                              📈 Resumen Global
+                            </h4>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                              <div className="text-center">
+                                <p className="text-2xl font-bold text-white">
+                                  {data.length}
+                                </p>
+                                <p className="text-xs text-slate-400">
+                                  Períodos Analizados
+                                </p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-2xl font-bold text-green-400">
+                                  {data
+                                    .reduce((s, p) => s + p.totalQuantity, 0)
+                                    .toLocaleString()}
+                                </p>
+                                <p className="text-xs text-slate-400">
+                                  Cantidad Total
+                                </p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-2xl font-bold text-blue-400">
+                                  {
+                                    [
+                                      ...new Set(
+                                        data.flatMap((p) =>
+                                          Object.keys(p.models),
+                                        ),
+                                      ),
+                                    ].length
+                                  }
+                                </p>
+                                <p className="text-xs text-slate-400">
+                                  Modelos Únicos
+                                </p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-2xl font-bold text-purple-400">
+                                  {Math.round(
+                                    data.reduce(
+                                      (s, p) => s + p.totalQuantity,
+                                      0,
+                                    ) / data.length,
+                                  )}
+                                </p>
+                                <p className="text-xs text-slate-400">
+                                  Promedio/Período
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
                     })()}
                   </div>
                 </div>
@@ -5093,24 +5267,38 @@ return (
                         {getFilteredHistory().map((entry) => (
                           <div
                             key={entry.id}
-                            className={`${
-                              darkMode ? "bg-slate-900/50" : "bg-slate-800/50"
-                            } p-4 rounded-lg border ${
-                              darkMode ? "border-slate-700" : "border-slate-700"
-                            }`}
+                            className={`${darkMode ? "bg-slate-900/50" : "bg-slate-800/50"} p-4 rounded-lg border ${darkMode ? "border-slate-700" : "border-slate-700"}`}
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex-1">
                                 <p className="text-white font-semibold">
-                                  {entry.action}
+                                  {String(entry.action || "Sin acción")}
                                 </p>
                                 <p className="text-slate-300 text-sm mt-1">
-                                  {entry.details}
+                                  {String(entry.details || "Sin detalles")}
                                 </p>
                                 <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
-                                  <span>👤 {entry.user}</span>
-                                  <span>📧 {entry.userEmail}</span>
-                                  <span>🕐 {entry.timestamp}</span>
+                                  <span>
+                                    👤{" "}
+                                    {typeof entry.user === "string"
+                                      ? entry.user
+                                      : typeof entry.user === "object"
+                                        ? entry.user.name ||
+                                          entry.user.email ||
+                                          "Usuario desconocido"
+                                        : "Usuario desconocido"}
+                                  </span>
+                                  <span>
+                                    📧{" "}
+                                    {typeof entry.userEmail === "string"
+                                      ? entry.userEmail
+                                      : typeof entry.userEmail === "object"
+                                        ? JSON.stringify(entry.userEmail)
+                                        : "Sin email"}
+                                  </span>
+                                  <span>
+                                    🕐 {String(entry.timestamp || "Sin fecha")}
+                                  </span>
                                 </div>
                               </div>
                               <button
@@ -5284,8 +5472,8 @@ return (
                     {editingItem
                       ? "✏️ Editar Material"
                       : batchMode
-                      ? "⚡ Carga Masiva (Lotes)"
-                      : "➕ Solicitar Material"}
+                        ? "⚡ Carga Masiva (Lotes)"
+                        : "➕ Solicitar Material"}
                   </h2>
 
                   {!editingItem && (
@@ -5312,8 +5500,8 @@ return (
                     batchMode
                       ? addToBatch
                       : editingItem
-                      ? handleUpdateMaterial
-                      : handleRequestMaterial
+                        ? handleUpdateMaterial
+                        : handleRequestMaterial
                   }
                   className="space-y-4"
                 >
@@ -5528,8 +5716,8 @@ return (
                       {editingItem
                         ? "Actualizar Item"
                         : batchMode
-                        ? "Agregar a la Lista"
-                        : "Enviar Solicitud"}
+                          ? "Agregar a la Lista"
+                          : "Enviar Solicitud"}
                     </button>
 
                     {editingItem && (
@@ -5652,23 +5840,23 @@ return (
                     📦 Inventario por Modelo
                   </h2>
                   {/* Solo mostrar selección múltiple si es admin principal */}
-{currentUser?.email === "admin@empresa.com" && (
-  <button
-    onClick={() => {
-      setSelectionMode(!selectionMode);
-      if (selectionMode) setSelectedItems([]);
-    }}
-    className={`px-3 py-1 rounded-lg text-sm font-semibold transition-colors ${
-      selectionMode
-        ? "bg-yellow-500 text-slate-900"
-        : "bg-slate-700 text-white hover:bg-slate-600"
-    }`}
-  >
-    {selectionMode
-      ? "🚫 Cancelar Selección"
-      : "✔️ Selección Múltiple"}
-  </button>
-)}
+                  {currentUser?.email === "admin@empresa.com" && (
+                    <button
+                      onClick={() => {
+                        setSelectionMode(!selectionMode);
+                        if (selectionMode) setSelectedItems([]);
+                      }}
+                      className={`px-3 py-1 rounded-lg text-sm font-semibold transition-colors ${
+                        selectionMode
+                          ? "bg-yellow-500 text-slate-900"
+                          : "bg-slate-700 text-white hover:bg-slate-600"
+                      }`}
+                    >
+                      {selectionMode
+                        ? "🚫 Cancelar Selección"
+                        : "✔️ Selección Múltiple"}
+                    </button>
+                  )}
                 </div>
 
                 <div className="relative">
@@ -5686,163 +5874,200 @@ return (
                   />
                 </div>
               </div>
-{/* PANEL DE FILTROS Y ORDENAMIENTO AVANZADO */}
-<div className="mb-4 p-4 bg-slate-900/30 rounded-lg border border-slate-700">
-  <div className="flex items-center justify-between mb-3">
-    <div className="flex items-center gap-2">
-      <Filter className="text-blue-400" />
-      <h4 className="text-white font-semibold text-sm">Filtros y Ordenamiento</h4>
-    </div>
-    {(inventoryFilterModelo || inventoryFilterUbicacion || inventoryFilterOperacion || 
-      inventoryFilterEquipo || inventoryFilterEstado !== "") && (
-      <button
-        onClick={() => {
-          setInventoryFilterModelo("");
-          setInventoryFilterUbicacion("");
-          setInventoryFilterOperacion("");
-          setInventoryFilterEquipo("");
-          setInventoryFilterEstado("");
-        }}
-        className="text-xs text-red-400 hover:text-red-300 underline"
-      >
-        Limpiar Filtros
-      </button>
-    )}
-  </div>
+              {/* PANEL DE FILTROS Y ORDENAMIENTO AVANZADO */}
+              <div className="mb-4 p-4 bg-slate-900/30 rounded-lg border border-slate-700">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Filter className="text-blue-400" />
+                    <h4 className="text-white font-semibold text-sm">
+                      Filtros y Ordenamiento
+                    </h4>
+                  </div>
+                  {(inventoryFilterModelo ||
+                    inventoryFilterUbicacion ||
+                    inventoryFilterOperacion ||
+                    inventoryFilterEquipo ||
+                    inventoryFilterEstado !== "") && (
+                    <button
+                      onClick={() => {
+                        setInventoryFilterModelo("");
+                        setInventoryFilterUbicacion("");
+                        setInventoryFilterOperacion("");
+                        setInventoryFilterEquipo("");
+                        setInventoryFilterEstado("");
+                      }}
+                      className="text-xs text-red-400 hover:text-red-300 underline"
+                    >
+                      Limpiar Filtros
+                    </button>
+                  )}
+                </div>
 
-  {/* Grid de Filtros */}
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 mb-3">
-    <div>
-      <label className="block text-xs text-slate-400 mb-1">🏷️ Modelo</label>
-      <input
-        type="text"
-        value={inventoryFilterModelo}
-        onChange={(e) => setInventoryFilterModelo(e.target.value)}
-        placeholder="Filtrar por modelo..."
-        className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
-      />
-    </div>
+                {/* Grid de Filtros */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 mb-3">
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">
+                      🏷️ Modelo
+                    </label>
+                    <input
+                      type="text"
+                      value={inventoryFilterModelo}
+                      onChange={(e) => setInventoryFilterModelo(e.target.value)}
+                      placeholder="Filtrar por modelo..."
+                      className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+                    />
+                  </div>
 
-    <div>
-      <label className="block text-xs text-slate-400 mb-1">📍 Ubicación</label>
-      <input
-        type="text"
-        value={inventoryFilterUbicacion}
-        onChange={(e) => setInventoryFilterUbicacion(e.target.value)}
-        placeholder="Filtrar por ubicación..."
-        className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
-      />
-    </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">
+                      📍 Ubicación
+                    </label>
+                    <input
+                      type="text"
+                      value={inventoryFilterUbicacion}
+                      onChange={(e) =>
+                        setInventoryFilterUbicacion(e.target.value)
+                      }
+                      placeholder="Filtrar por ubicación..."
+                      className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+                    />
+                  </div>
 
-    <div>
-      <label className="block text-xs text-slate-400 mb-1">⚙️ Operación</label>
-      <input
-        type="text"
-        value={inventoryFilterOperacion}
-        onChange={(e) => setInventoryFilterOperacion(e.target.value)}
-        placeholder="Filtrar por operación..."
-        className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
-      />
-    </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">
+                      ⚙️ Operación
+                    </label>
+                    <input
+                      type="text"
+                      value={inventoryFilterOperacion}
+                      onChange={(e) =>
+                        setInventoryFilterOperacion(e.target.value)
+                      }
+                      placeholder="Filtrar por operación..."
+                      className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+                    />
+                  </div>
 
-    <div>
-      <label className="block text-xs text-slate-400 mb-1">🔧 Equipo</label>
-      <input
-        type="text"
-        value={inventoryFilterEquipo}
-        onChange={(e) => setInventoryFilterEquipo(e.target.value)}
-        placeholder="Filtrar por equipo..."
-        className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
-      />
-    </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">
+                      🔧 Equipo
+                    </label>
+                    <input
+                      type="text"
+                      value={inventoryFilterEquipo}
+                      onChange={(e) => setInventoryFilterEquipo(e.target.value)}
+                      placeholder="Filtrar por equipo..."
+                      className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+                    />
+                  </div>
 
-    <div>
-      <label className="block text-xs text-slate-400 mb-1">📊 Estado Stock</label>
-      <select
-        value={inventoryFilterEstado}
-        onChange={(e) => setInventoryFilterEstado(e.target.value)}
-        className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
-      >
-        <option value="">Todos</option>
-        <option value="critico">🔴 Crítico</option>
-        <option value="bajo">⚠️ Bajo</option>
-        <option value="alto">📦 Alto</option>
-        <option value="ok">✅ OK</option>
-      </select>
-    </div>
-  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">
+                      📊 Estado Stock
+                    </label>
+                    <select
+                      value={inventoryFilterEstado}
+                      onChange={(e) => setInventoryFilterEstado(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm"
+                    >
+                      <option value="">Todos</option>
+                      <option value="critico">🔴 Crítico</option>
+                      <option value="bajo">⚠️ Bajo</option>
+                      <option value="alto">📦 Alto</option>
+                      <option value="ok">✅ OK</option>
+                    </select>
+                  </div>
+                </div>
 
-  {/* Controles de Ordenamiento */}
-  <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-slate-700">
-    <span className="text-sm text-slate-400">Ordenar por:</span>
-    
-    <button
-      onClick={() => setInventorySortBy("modelo")}
-      className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
-        inventorySortBy === "modelo"
-          ? "bg-blue-600 text-white"
-          : "bg-slate-700 text-slate-300 hover:bg-slate-600"
-      }`}
-    >
-      🏷️ Modelo
-    </button>
+                {/* Controles de Ordenamiento */}
+                <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-slate-700">
+                  <span className="text-sm text-slate-400">Ordenar por:</span>
 
-    <button
-      onClick={() => setInventorySortBy("cantidad")}
-      className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
-        inventorySortBy === "cantidad"
-          ? "bg-blue-600 text-white"
-          : "bg-slate-700 text-slate-300 hover:bg-slate-600"
-      }`}
-    >
-      📊 Cantidad Total
-    </button>
+                  <button
+                    onClick={() => setInventorySortBy("modelo")}
+                    className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                      inventorySortBy === "modelo"
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                    }`}
+                  >
+                    🏷️ Modelo
+                  </button>
 
-    <button
-      onClick={() => setInventorySortBy("ubicaciones")}
-      className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
-        inventorySortBy === "ubicaciones"
-          ? "bg-blue-600 text-white"
-          : "bg-slate-700 text-slate-300 hover:bg-slate-600"
-      }`}
-    >
-      📍 Nº Ubicaciones
-    </button>
+                  <button
+                    onClick={() => setInventorySortBy("cantidad")}
+                    className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                      inventorySortBy === "cantidad"
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                    }`}
+                  >
+                    📊 Cantidad Total
+                  </button>
 
-    <button
-      onClick={() => setInventorySortBy("estado")}
-      className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
-        inventorySortBy === "estado"
-          ? "bg-blue-600 text-white"
-          : "bg-slate-700 text-slate-300 hover:bg-slate-600"
-      }`}
-    >
-      ⚠️ Estado Stock
-    </button>
+                  <button
+                    onClick={() => setInventorySortBy("ubicaciones")}
+                    className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                      inventorySortBy === "ubicaciones"
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                    }`}
+                  >
+                    📍 Nº Ubicaciones
+                  </button>
 
-    <div className="ml-auto flex items-center gap-2">
-      <span className="text-xs text-slate-400">Orden:</span>
-      <button
-        onClick={() => setInventorySortOrder(inventorySortOrder === "asc" ? "desc" : "asc")}
-        className="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-semibold flex items-center gap-1"
-      >
-        {inventorySortOrder === "asc" ? "↑ Ascendente" : "↓ Descendente"}
-      </button>
-    </div>
-  </div>
+                  <button
+                    onClick={() => setInventorySortBy("estado")}
+                    className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                      inventorySortBy === "estado"
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                    }`}
+                  >
+                    ⚠️ Estado Stock
+                  </button>
 
-  {/* Contador de resultados */}
-  <div className="mt-3 pt-3 border-t border-slate-700">
-    <p className="text-xs text-slate-400">
-      Mostrando <span className="text-blue-400 font-bold">{filteredInventory.length}</span> items de{" "}
-      <span className="text-white font-bold">{inventory.length}</span> totales
-      {(inventoryFilterModelo || inventoryFilterUbicacion || inventoryFilterOperacion || 
-        inventoryFilterEquipo || inventoryFilterEstado) && (
-        <span className="text-yellow-400 ml-2">(filtrado activo)</span>
-      )}
-    </p>
-  </div>
-</div>
+                  <div className="ml-auto flex items-center gap-2">
+                    <span className="text-xs text-slate-400">Orden:</span>
+                    <button
+                      onClick={() =>
+                        setInventorySortOrder(
+                          inventorySortOrder === "asc" ? "desc" : "asc",
+                        )
+                      }
+                      className="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-semibold flex items-center gap-1"
+                    >
+                      {inventorySortOrder === "asc"
+                        ? "↑ Ascendente"
+                        : "↓ Descendente"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Contador de resultados */}
+                <div className="mt-3 pt-3 border-t border-slate-700">
+                  <p className="text-xs text-slate-400">
+                    Mostrando{" "}
+                    <span className="text-blue-400 font-bold">
+                      {filteredInventory.length}
+                    </span>{" "}
+                    items de{" "}
+                    <span className="text-white font-bold">
+                      {inventory.length}
+                    </span>{" "}
+                    totales
+                    {(inventoryFilterModelo ||
+                      inventoryFilterUbicacion ||
+                      inventoryFilterOperacion ||
+                      inventoryFilterEquipo ||
+                      inventoryFilterEstado) && (
+                      <span className="text-yellow-400 ml-2">
+                        (filtrado activo)
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
 
               {/* BARRA DE ACCIONES MASIVAS */}
               {selectionMode && selectedItems.length > 0 && (
@@ -5978,19 +6203,19 @@ return (
                                         isCritical
                                           ? "bg-red-600 text-white"
                                           : isLow
-                                          ? "bg-yellow-600 text-white"
-                                          : isHigh
-                                          ? "bg-blue-600 text-white"
-                                          : "bg-green-600 text-white"
+                                            ? "bg-yellow-600 text-white"
+                                            : isHigh
+                                              ? "bg-blue-600 text-white"
+                                              : "bg-green-600 text-white"
                                       }`}
                                     >
                                       {isCritical
                                         ? "CRÍTICO"
                                         : isLow
-                                        ? "BAJO"
-                                        : isHigh
-                                        ? "ALTO"
-                                        : "OK"}
+                                          ? "BAJO"
+                                          : isHigh
+                                            ? "ALTO"
+                                            : "OK"}
                                     </span>
                                   </td>
                                   <td className="py-4 px-3">
@@ -6024,7 +6249,7 @@ return (
                                             type="checkbox"
                                             className="w-4 h-4 rounded border-slate-600 text-blue-600 focus:ring-blue-500"
                                             checked={selectedItems.includes(
-                                              item.id
+                                              item.id,
                                             )}
                                             onChange={() =>
                                               toggleSelectItem(item.id)
@@ -6092,7 +6317,7 @@ return (
                                   ))}
                               </React.Fragment>
                             );
-                          }
+                          },
                         );
                       })()}
                     </tbody>
