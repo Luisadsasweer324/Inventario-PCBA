@@ -2857,19 +2857,19 @@ const filteredInventory = getFilteredAndSortedInventory();
 
           const materialsWithActivity = inventory.map((item) => {
             // Buscar última actividad de este item en el historial
-            const lastActivity = changeHistory
-              .filter(
-                (entry) =>
-                  entry.details
-                    .toLowerCase()
-                    .includes(item.modelo.toLowerCase()) &&
-                  (entry.details
-                    .toLowerCase()
-                    .includes(item.ubicacion.toLowerCase()) ||
-                    entry.action.includes("ajustó") ||
-                    entry.action.includes("editado") ||
-                    entry.action.includes("agregó"))
-              )
+          const lastActivity = changeHistory
+  .filter(entry => {
+    if (!entry || !entry.details || !entry.action) return false;
+    const details = String(entry.details).toLowerCase();
+    const modelo = String(item.modelo).toLowerCase();
+    const ubicacion = String(item.ubicacion).toLowerCase();
+    
+    return details.includes(modelo) &&
+      (details.includes(ubicacion) ||
+        entry.action.includes('ajustó') ||
+        entry.action.includes('editado') ||
+        entry.action.includes('agregó'));
+  })
               .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
 
             // Determinar fecha de última actividad
