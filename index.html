@@ -775,6 +775,7 @@
         // Nuevos estados para análisis avanzado de fechas
         const [dateRangeType, setDateRangeType] = useState("week"); // 'day', 'week', 'month', 'year'
         const [dateFieldType, setDateFieldType] = useState("registro"); // 'registro' o 'etiqueta'
+        const [dayRangeFilter, setDayRangeFilter] = useState('all'); // 'all', '1-7', '8-14', '15-21', '22-30'
         const [chartViewType, setChartViewType] = useState("bar"); // 'bar', 'line', 'area', 'pie'
         const [customStartDate, setCustomStartDate] = useState("");
         const [customEndDate, setCustomEndDate] = useState("");
@@ -4164,7 +4165,202 @@ const getFilteredAndSortedInventory = () => {
                       </div>
                     </div>
                   </div>
+{/* NUEVO: FILTRO POR FRECUENCIA DE DÍAS */}
+<div className="mb-8">
+  <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+    📅 Análisis por Antigüedad en Inventario
+  </h3>
 
+  {/* Panel de Control */}
+  <div className="mb-6 p-6 bg-gradient-to-r from-purple-900/30 to-pink-900/30 rounded-xl border-2 border-purple-500/50">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      {/* Tipo de Fecha */}
+      <div>
+        <label className="block text-xs text-purple-300 mb-2 font-semibold">
+          📆 Filtrar Por
+        </label>
+        <select
+          value={dateFieldType}
+          onChange={(e) => setDateFieldType(e.target.value)}
+          className="w-full px-3 py-2 bg-slate-900/70 border border-purple-500 rounded-lg text-white font-semibold"
+        >
+          <option value="registro">📥 Fecha de Registro</option>
+          <option value="etiqueta">🏷️ Fecha de Etiqueta</option>
+        </select>
+      </div>
+
+      {/* Rango de Días */}
+      <div>
+        <label className="block text-xs text-pink-300 mb-2 font-semibold">
+          ⏱️ Rango de Días
+        </label>
+        <select
+          value={dayRangeFilter}
+          onChange={(e) => setDayRangeFilter(e.target.value)}
+          className="w-full px-3 py-2 bg-slate-900/70 border border-pink-500 rounded-lg text-white font-semibold"
+        >
+          <option value="all">📊 Todos los Rangos</option>
+          <option value="1-7">📅 1-7 Días (1 Semana)</option>
+          <option value="8-14">📅 8-14 Días (2 Semanas)</option>
+          <option value="15-21">📅 15-21 Días (3 Semanas)</option>
+          <option value="22-30">📅 22-30 Días (1 Mes)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  {/* Gráfica de Barras */}
+  <div className={`${darkMode ? 'bg-slate-900/50' : 'bg-slate-800/50'} p-6 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-700'}`}>
+    <h4 className="text-xl font-bold text-white mb-4">📊 Cantidad Total por Antigüedad</h4>
+    
+    {(() => {
+      const now = new Date();
+      const ranges = {
+        '1-7días': { min: 1, max: 7, total: 0, items: [] },
+        '8-14días': { min: 8, max: 14, total: 0, items: [] },
+        '15-21días': { min: 15, max: 21, total: 0, items: [] },
+        '22-30días': { min: 22, max: 30, total: 0, items: [] },
+        '31+días': { min: 31, max: Infinity, total: 0, items: [] }
+      };
+
+      // Procesar inventario
+      inventory.forEach(item => {
+        const itemDate = dateFieldType === 'registro' 
+          ? new Date(item.fechaRegistro)
+          : new Date(item.fechaEtiqueta);
+        
+        const daysDiff = Math.floor((now - itemDate) / (1000 * 60 * 60 * 24));
+
+        for (let [rangeName, range] of Object.entries(ranges)) {
+          if (daysDiff >= range.min && daysDiff <= range.max) {
+            range.total += parseInt(item.cantidad) || 0;
+            range.items.push({ ...item, daysSince: daysDiff });
+            break;
+          }
+        }
+      });
+
+      const maxTotal = Math.max(...Object.values(ranges).map(d => d.total), 1);
+
+      return (
+        <div>
+          {/* Gráfica de Barras */}
+          <div className="flex items-end gap-4 h-80 p-4">
+            {Object.entries(ranges).map(([rangeName, data]) => {
+              const height = (data.total / maxTotal) * 100;
+              
+              return (
+                <div key={rangeName} className="flex-1 flex flex-col items-center justify-end h-full group">
+                  <div className="text-center mb-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <p className="text-xs font-bold text-white bg-slate-900 px-2 py-1 rounded shadow-lg">
+                      {data.total.toLocaleString()}
+                    </p>
+                  </div>
+                  <div
+                    className="w-full rounded-t-lg transition-all duration-300 bg-gradient-to-t from-blue-600 to-blue-400 hover:opacity-90 shadow-lg"
+                    style={{ height: `${Math.max(height, 2)}%` }}
+                    title={`${rangeName}: ${data.total}`}
+                  />
+                  <p className="text-xs text-slate-300 mt-2 text-center font-medium">
+                    {rangeName}
+                  </p>
+                  <p className="text-xs text-slate-500 text-center">
+                    {data.items.length} item{data.items.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Estadísticas Resumen */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6 pt-6 border-t border-slate-700">
+            {Object.entries(ranges).map(([rangeName, data]) => (
+              <div key={rangeName} className="text-center bg-blue-900/30 p-4 rounded-lg border border-blue-500/50">
+                <p className="text-2xl font-bold text-white">{data.total.toLocaleString()}</p>
+                <p className="text-xs text-slate-400 mt-1">{rangeName}</p>
+                <p className="text-xs text-slate-500 mt-1">{data.items.length} registros</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Tabla Detallada */}
+          {dayRangeFilter !== 'all' && (() => {
+            const [min, max] = dayRangeFilter.split('-').map(n => parseInt(n));
+            const filtered = inventory.filter(item => {
+              const itemDate = dateFieldType === 'registro' 
+                ? new Date(item.fechaRegistro)
+                : new Date(item.fechaEtiqueta);
+              const daysSince = Math.floor((now - itemDate) / (1000 * 60 * 60 * 24));
+              return daysSince >= min && daysSince <= (max || Infinity);
+            });
+
+            if (filtered.length === 0) return null;
+
+            return (
+              <div className="mt-6 p-6 bg-slate-900/50 rounded-lg border border-slate-700">
+                <h4 className="text-xl font-bold text-white mb-4">
+                  📋 Detalle de Productos ({dayRangeFilter} días)
+                </h4>
+                
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-slate-800">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Modelo</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Ubicación</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Cantidad</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">
+                          {dateFieldType === 'registro' ? 'Fecha Registro' : 'Fecha Etiqueta'}
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Días</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-700">
+                      {filtered.map((item, index) => {
+                        const itemDate = dateFieldType === 'registro' 
+                          ? new Date(item.fechaRegistro)
+                          : new Date(item.fechaEtiqueta);
+                        const daysSince = Math.floor((now - itemDate) / (1000 * 60 * 60 * 24));
+                        
+                        return (
+                          <tr key={index} className="hover:bg-slate-800/50">
+                            <td className="px-4 py-3 text-white font-medium">{item.modelo}</td>
+                            <td className="px-4 py-3 text-slate-300">{item.ubicacion}</td>
+                            <td className="px-4 py-3 text-right text-blue-400 font-bold">{item.cantidad}</td>
+                            <td className="px-4 py-3 text-slate-300">
+                              {itemDate.toLocaleDateString('es-MX')}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                                daysSince <= 7 ? 'bg-green-600/20 text-green-400' :
+                                daysSince <= 14 ? 'bg-blue-600/20 text-blue-400' :
+                                daysSince <= 21 ? 'bg-yellow-600/20 text-yellow-400' :
+                                'bg-red-600/20 text-red-400'
+                              }`}>
+                                {daysSince} días
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-4 p-4 bg-blue-900/20 rounded-lg border border-blue-700">
+                  <p className="text-blue-300 text-sm">
+                    📊 Total: <strong>{filtered.length}</strong> productos | 
+                    Cantidad total: <strong>{filtered.reduce((sum, item) => sum + parseInt(item.cantidad || 0), 0).toLocaleString()}</strong> unidades
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      );
+    })()}
+  </div>
+</div>
                   {/* MATERIAL DETENIDO */}
                   <div>
                     <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
