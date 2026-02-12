@@ -97,7 +97,7 @@
 
     <script>
       // ==================== CONFIGURACIÓN DE FIREBASE ====================
-          const firebaseConfig = {
+      const firebaseConfig = {
         apiKey: "AIzaSyBdaZe_ep_B25I5pYtJLap46-_xJmYupPI",
         authDomain: "inventario-empresa-3455c.firebaseapp.com",
         databaseURL:
@@ -754,11 +754,6 @@
         const [connectionStatus, setConnectionStatus] = useState(
           firebaseInitialized ? "connected" : "local",
         );
-// ========== NUEVOS ESTADOS PARA CATÁLOGO DE MODELOS ==========
-const [modelosCatalogo, setModelosCatalogo] = useState([]);
-const [showModelManager, setShowModelManager] = useState(false);
-const [modeloSearch, setModeloSearch] = useState("");
-const [showModelSuggestions, setShowModelSuggestions] = useState(false);
 
         // Filtros de historial
         const [historyFilterUser, setHistoryFilterUser] = useState("");
@@ -947,17 +942,7 @@ const [showModelSuggestions, setShowModelSuggestions] = useState(false);
             window.storage.off("change-history");
           };
         }, []);
-  // ========== NUEVO useEffect: CERRAR SUGERENCIAS AL HACER CLIC FUERA ==========
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (!e.target.closest('#inputModelo')) {
-        setShowModelSuggestions(false);
-      }
-    };
 
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, []);
         useEffect(() => {
           const loadData = async () => {
             try {
@@ -1056,11 +1041,6 @@ const [showModelSuggestions, setShowModelSuggestions] = useState(false);
               if (blocklistsResult) {
                 setBlocklists(JSON.parse(blocklistsResult.value));
               }
-              // ========== NUEVO: CARGAR CATÁLOGO DE MODELOS ==========
-const catalogoResult = await window.storage.get("catalogo-modelos");
-if (catalogoResult) {
-  setModelosCatalogo(JSON.parse(catalogoResult.value));
-}
 
               // Modo oscuro (localStorage - privado por dispositivo)
               const darkModeResult = localStorage.getItem("dark-mode");
@@ -1389,31 +1369,8 @@ if (catalogoResult) {
           if (!formData.modelo || !formData.cantidad || !formData.ubicacion) {
             alert("Por favor completa: Modelo, Cantidad y Ubicación");
             return;
-          } 
+          }
 
-        
-  // ========== VALIDACIÓN ESTRICTA: VERIFICAR CATÁLOGO ==========
-  if (modelosCatalogo.length > 0) {
-    if (!modelosCatalogo.includes(formData.modelo.toUpperCase())) {
-      alert(
-        `❌ MODELO NO VÁLIDO\n\n` +
-        `El modelo "${formData.modelo}" NO existe en el catálogo del sistema.\n\n` +
-        `✓ Solo puedes usar modelos registrados oficialmente\n` +
-        `✓ Selecciona un modelo de la lista desplegable\n` +
-        `✓ Si el modelo no aparece, contacta al administrador\n\n` +
-        `Modelos disponibles: ${modelosCatalogo.length}`
-      );
-      // Limpiar el campo de modelo para forzar selección correcta
-      setFormData({ ...formData, modelo: "" });
-      document.getElementById('inputModelo')?.focus();
-      return;
-    }
-  }
-
-  if (!formData.fechaEtiqueta) {
-    alert("⚠️ Completa la Fecha de Etiqueta");
-    return;
-  }
           // Función para agregar a la lista temporal (Cola de envío)
           const addToBatch = (e) => {
             e.preventDefault();
@@ -1430,18 +1387,6 @@ if (catalogoResult) {
               );
               return;
             }
-              // ========== VALIDACIÓN ESTRICTA EN EDICIÓN ==========
-  if (modelosCatalogo.length > 0) {
-    if (!modelosCatalogo.includes(formData.modelo.toUpperCase())) {
-      alert(
-        `❌ MODELO NO VÁLIDO\n\n` +
-        `No puedes cambiar a un modelo que no existe en el catálogo.\n\n` +
-        `Modelo actual: "${editingItem.modelo}"\n` +
-        `Modelo inválido: "${formData.modelo}"`
-      );
-      return;
-    }
-  }
 
             const newItem = {
               id: Date.now(),
@@ -1659,24 +1604,6 @@ if (catalogoResult) {
             alert("Por favor completa: Modelo, Cantidad y Ubicación");
             return;
           }
-          // ========== VALIDACIÓN ESTRICTA PARA BATCH ==========
-  if (modelosCatalogo.length > 0) {
-    if (!modelosCatalogo.includes(formData.modelo.toUpperCase())) {
-      alert(
-        `❌ MODELO NO VÁLIDO EN LOTE\n\n` +
-        `"${formData.modelo}" no está en el catálogo.\n\n` +
-        `No puedes agregar modelos no registrados al lote.`
-      );
-      setFormData({ ...formData, modelo: "" });
-      document.getElementById('inputModelo')?.focus();
-      return;
-    }
-  }
-
-  if (!formData.fechaEtiqueta) {
-    alert("⚠️ Completa la Fecha de Etiqueta");
-    return;
-  }
 
           const batchItem = {
             id: Date.now(),
@@ -2172,7 +2099,6 @@ if (catalogoResult) {
                       errors++;
                       return null;
                     }
-                    
 
                     imported++;
                     return {
@@ -2220,77 +2146,6 @@ if (catalogoResult) {
           reader.readAsArrayBuffer(file);
           e.target.value = "";
         };
-
-        // ========== NUEVA FUNCIÓN: IMPORTAR CATÁLOGO DE MODELOS ==========
-const handleImportModelos = (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = (evt) => {
-    try {
-      const data = new Uint8Array(evt.target.result);
-      const workbook = XLSX.read(data, { type: "array" });
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-
-      const modelosImportados = new Set();
-      let errores = 0;
-
-      jsonData.forEach((row) => {
-        const modelo = row.Modelo || row.MODELO || row.modelo || row.Model || row.MODEL;
-        
-        if (modelo && String(modelo).trim()) {
-          modelosImportados.add(String(modelo).trim().toUpperCase());
-        } else {
-          errores++;
-        }
-      });
-
-      const catalogoActualizado = [
-        ...new Set([...modelosCatalogo, ...Array.from(modelosImportados)])
-      ].sort();
-
-      setModelosCatalogo(catalogoActualizado);
-      saveToStorage("catalogo-modelos", catalogoActualizado);
-
-      addToHistory(
-        "Importación de catálogo",
-        `${currentUser.name} importó ${modelosImportados.size} modelos al catálogo`,
-        currentUser
-      );
-
-      alert(
-        `✅ Importación completada:\n\n✓ ${modelosImportados.size} modelos importados\n${
-          errores > 0 ? `✗ ${errores} filas sin modelo válido` : ""
-        }\n\nTotal en catálogo: ${catalogoActualizado.length}`
-      );
-    } catch (error) {
-      console.error("Error:", error);
-      alert("❌ Error al importar el archivo. Verifica que tenga una columna 'Modelo'.");
-    }
-  };
-  reader.readAsArrayBuffer(file);
-  e.target.value = "";
-};
-
-// ========== NUEVA FUNCIÓN: ELIMINAR MODELO DEL CATÁLOGO ==========
-const deleteModelo = (modelo) => {
-  if (!confirm(`¿Eliminar "${modelo}" del catálogo?\n\nNota: Esto NO eliminará los registros existentes en inventario.`)) {
-    return;
-  }
-
-  const catalogoActualizado = modelosCatalogo.filter(m => m !== modelo);
-  setModelosCatalogo(catalogoActualizado);
-  saveToStorage("catalogo-modelos", catalogoActualizado);
-
-  addToHistory(
-    "Modelo eliminado del catálogo",
-    `${currentUser.name} eliminó "${modelo}" del catálogo`,
-    currentUser
-  );
-};
-
 
        // Filtrado y ordenamiento avanzado del inventario
 const getFilteredAndSortedInventory = () => {
@@ -3368,14 +3223,6 @@ const getFilteredAndSortedInventory = () => {
                           >
                             <Users /> Usuarios
                           </button>
-
-                              {/* ========== NUEVO BOTÓN: GESTOR DE MODELOS ========== */}
-    <button
-      onClick={() => setShowModelManager(!showModelManager)}
-      className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm"
-    >
-      <Tag /> Modelos
-    </button>
                         </>
                       )}
                       <button
@@ -5697,107 +5544,6 @@ const getFilteredAndSortedInventory = () => {
                 </div>
               )}
 
-                 {/* ========== NUEVO PANEL: GESTOR DE CATÁLOGO DE MODELOS ========== */}
-      {currentUser?.email === "admin@empresa.com" && showModelManager && (
-        <div
-          className={`${
-            darkMode ? "bg-slate-900/70" : "bg-slate-800/50"
-          } backdrop-blur-xl rounded-xl p-6 border ${
-            darkMode ? "border-slate-700" : "border-slate-700"
-          }`}
-        >
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-              <Tag /> Gestión de Catálogo de Modelos
-            </h2>
-            <button
-              onClick={() => setShowModelManager(false)}
-              className="text-slate-400 hover:text-white"
-            >
-              <XCircle />
-            </button>
-          </div>
-
-          {/* Importar Modelos */}
-          <div className="mb-6 p-4 bg-blue-900/20 border border-blue-500 rounded-lg">
-            <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
-              <Upload /> Importar Modelos desde Excel
-            </h3>
-            <p className="text-blue-300 text-sm mb-3">
-              📋 El archivo debe contener una columna llamada "Modelo" con los códigos de producto.
-            </p>
-            <input
-              type="file"
-              onChange={handleImportModelos}
-              accept=".xlsx,.xls"
-              className="hidden"
-              id="importModelos"
-            />
-            <button
-              onClick={() => document.getElementById('importModelos').click()}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold"
-            >
-              <Upload /> Seleccionar Archivo Excel
-            </button>
-          </div>
-
-          {/* Lista de Modelos */}
-          <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-white font-semibold">
-                📦 Modelos en Catálogo ({modelosCatalogo.length})
-              </h3>
-              <button
-                onClick={() => {
-                  const wb = XLSX.utils.book_new();
-                  const ws = XLSX.utils.aoa_to_sheet([
-                    ["Modelo"],
-                    ...modelosCatalogo.map(m => [m])
-                  ]);
-                  XLSX.utils.book_append_sheet(wb, ws, "Modelos");
-                  XLSX.writeFile(wb, `catalogo_modelos_${new Date().toISOString().split('T')[0]}.xlsx`);
-                }}
-                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
-              >
-                <Download /> Exportar
-              </button>
-            </div>
-
-            {modelosCatalogo.length === 0 ? (
-              <div className="text-center py-8">
-                <Package className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                <p className="text-slate-400">No hay modelos en el catálogo</p>
-                <p className="text-slate-500 text-sm mt-1">Importa un archivo Excel para comenzar</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-96 overflow-y-auto p-2">
-                {modelosCatalogo.map((modelo, i) => (
-                  <div
-                    key={i}
-                    className="bg-slate-800/50 p-3 rounded-lg border border-slate-700 flex items-center justify-between group hover:border-blue-500 transition-colors"
-                  >
-                    <span className="text-white font-mono text-sm">{modelo}</span>
-                    <button
-                      onClick={() => deleteModelo(modelo)}
-                      className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-opacity"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="mt-4 p-4 bg-yellow-900/20 border border-yellow-700 rounded-lg">
-            <p className="text-yellow-300 text-sm">
-              💡 <strong>Importante:</strong> Solo los modelos registrados en este catálogo podrán ser utilizados al solicitar material. Esto previene errores de captura y duplicados.
-            </p>
-          </div>
-        </div>
-      )}
-
-
               {/* SOLICITUDES DE USUARIOS */}
               {currentUser?.role === "admin" && pendingUsers.length > 0 && (
                 <div
@@ -5991,113 +5737,25 @@ const getFilteredAndSortedInventory = () => {
                     {/* Cambiado a 4 columnas para espacio */}
                     {/* Modelo */}
                     <div className="lg:col-span-1">
-  <label className="block text-sm font-medium text-slate-300 mb-2">
-    Modelo * {modelosCatalogo.length > 0 && (
-      <span className="text-xs text-blue-400">
-        ({modelosCatalogo.length} en catálogo)
-      </span>
-    )}
-  </label>
-  <div className="relative">
-   <input
-  id="inputModelo"
-  type="text"
-  value={formData.modelo}
-  onChange={(e) => {
-    const value = e.target.value.toUpperCase();
-    setFormData({ ...formData, modelo: value });
-    setModeloSearch(value);
-    setShowModelSuggestions(value.length > 0 && modelosCatalogo.length > 0);
-  }}
-  onFocus={() => {
-    if (modelosCatalogo.length > 0) {
-      setShowModelSuggestions(true);
-    }
-  }}
-
-    onPaste={(e) => {
-    if (modelosCatalogo.length > 0) {
-      e.preventDefault();
-      const pastedText = e.clipboardData.getData('text').toUpperCase().trim();
-      
-      if (modelosCatalogo.includes(pastedText)) {
-        setFormData({ ...formData, modelo: pastedText });
-        setShowModelSuggestions(false);
-      } else {
-        alert(`❌ El modelo "${pastedText}" no existe en el catálogo`);
-      }
-    }
-  }}
-
-  className={`w-full px-4 py-2 ${
-    darkMode ? "bg-slate-900/50" : "bg-slate-900/50"
-  } border-2 ${
-    modelosCatalogo.length > 0 && formData.modelo
-      ? modelosCatalogo.includes(formData.modelo.toUpperCase())
-        ? "border-green-500"
-        : "border-red-500"
-      : darkMode ? "border-slate-600" : "border-slate-600"
-  } rounded-lg text-white focus:ring-2 ${
-    modelosCatalogo.length > 0 && formData.modelo && !modelosCatalogo.includes(formData.modelo.toUpperCase())
-      ? "focus:ring-red-500"
-      : "focus:ring-blue-500"
-  }`}
-      placeholder={modelosCatalogo.length > 0 ? "Buscar modelo..." : "ABC-123"}
-      required
-      autoComplete="off"
-    />
-    
-    {/* Lista desplegable de sugerencias */}
-    {showModelSuggestions && modelosCatalogo.length > 0 && (
-      <div className="absolute z-50 w-full mt-1 max-h-60 overflow-y-auto bg-slate-800 border border-slate-600 rounded-lg shadow-xl">
-        {modelosCatalogo
-          .filter(m => m.includes(modeloSearch))
-          .slice(0, 20)
-          .map((modelo, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => {
-                setFormData({ ...formData, modelo });
-                setShowModelSuggestions(false);
-                setModeloSearch("");
-                document.getElementById('inputModelo').blur();
-              }}
-              className="w-full px-4 py-2 text-left text-white hover:bg-blue-600 transition-colors text-sm"
-            >
-              {modelo}
-            </button>
-          ))}
-        {modelosCatalogo.filter(m => m.includes(modeloSearch)).length === 0 && (
-          <div className="px-4 py-3 text-slate-400 text-sm">
-            ⚠️ No se encontró "{modeloSearch}" en el catálogo
-          </div>
-        )}
-      </div>
-    )}
-  </div>
-{/* Indicadores de validación */}
-  {modelosCatalogo.length === 0 && (
-    <p className="text-xs text-yellow-400 mt-1">
-      ⚠️ No hay modelos en el catálogo. Importa modelos desde el gestor.
-    </p>
-  )}
-  
-  {modelosCatalogo.length > 0 && formData.modelo && (
-    <div className="mt-1">
-      {modelosCatalogo.includes(formData.modelo.toUpperCase()) ? (
-        <p className="text-xs text-green-400 flex items-center gap-1">
-          <CheckCircle className="w-3 h-3" /> Modelo válido ✓
-        </p>
-      ) : (
-        <p className="text-xs text-red-400 flex items-center gap-1 animate-pulse">
-          <XCircle className="w-3 h-3" /> 
-          Este modelo NO existe en el catálogo. Selecciona uno de la lista.
-        </p>
-      )}
-    </div>
-  )}
-</div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Modelo *
+                      </label>
+                      <input
+                        id="inputModelo"
+                        type="text"
+                        value={formData.modelo}
+                        onChange={(e) =>
+                          setFormData({ ...formData, modelo: e.target.value })
+                        }
+                        className={`w-full px-4 py-2 ${
+                          darkMode ? "bg-slate-900/50" : "bg-slate-900/50"
+                        } border ${
+                          darkMode ? "border-slate-600" : "border-slate-600"
+                        } rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
+                        placeholder="ABC-123"
+                        required
+                      />
+                    </div>
                     {/* Cantidad */}
                     <div className="lg:col-span-1">
                       <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -6270,22 +5928,13 @@ const getFilteredAndSortedInventory = () => {
 
                   <div className="flex gap-3 pt-2">
                     <button
-  type="submit"
-  disabled={
-    modelosCatalogo.length > 0 && 
-    formData.modelo && 
-    !modelosCatalogo.includes(formData.modelo.toUpperCase())
-  }
-  className={`flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-lg font-bold shadow-lg transition-transform active:scale-95 ${
-    modelosCatalogo.length > 0 && 
-    formData.modelo && 
-    !modelosCatalogo.includes(formData.modelo.toUpperCase())
-      ? "bg-gray-600 cursor-not-allowed opacity-50"
-      : batchMode
-        ? "bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white"
-        : "bg-blue-600 hover:bg-blue-700 text-white"
-  }`}
->
+                      type="submit"
+                      className={`flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-lg font-bold shadow-lg transition-transform active:scale-95 ${
+                        batchMode
+                          ? "bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white"
+                          : "bg-blue-600 hover:bg-blue-700 text-white"
+                      }`}
+                    >
                       {batchMode ? (
                         <PlusCircle className="w-5 h-5" />
                       ) : (
